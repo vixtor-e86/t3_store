@@ -2,7 +2,7 @@
 // Supports:
 // 1. Vercel Blob (BLOB_READ_WRITE_TOKEN) - 1-click in Vercel Storage
 // 2. Upstash Redis / Vercel KV (KV_REST_API_URL / UPSTASH_REDIS_REST_URL)
-// 3. Fallback to local browser storage if neither is configured yet.
+// 3. Fallback reporting if neither is configured in Vercel environment.
 
 export const config = {
   runtime: 'nodejs',
@@ -11,7 +11,8 @@ export const config = {
 interface RequestLike {
   method?: string
   body?: any
-  query?: Record<string, string>
+  query?: Record<string, string | string[]>
+  url?: string
 }
 
 interface ResponseLike {
@@ -31,6 +32,9 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   )
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
 
   if (req.method === 'OPTIONS') {
     res.status(200).json({})
@@ -41,13 +45,48 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
   const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL
   const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN
 
-  // ─── 1. Handling GET: Read drinks from Vercel Blob or KV ─────────
+  const isCheckMode =
+    Boolean(req.query?.check || req.query?.status) ||
+    Boolean(req.url && (req.url.includes('check=1') || req.url.includes('status=1')))
+
+  // ─── 0. Diagnostics Check Endpoint: /api/products?check=1 ───────────────────
+  if (isCheckMode) {
+    let blobLive = false
+    let blobError: string | null = null
+
+    if (blobToken) {
+      try {
+        const { list } = await import('@vercel/blob')
+        await list({ prefix: `${STORAGE_KEY}.json`, token: blobToken })
+        blobLive = true
+      } catch (err: any) {
+        blobError = err?.message || String(err)
+      }
+    }
+
+    res.status(200).json({
+      status: 'ok',
+      storage: blobLive ? 'blob' : blobToken ? 'blob_error' : kvUrl ? 'kv' : 'none',
+      blob: {
+        configured: Boolean(blobToken),
+        connected: blobLive,
+        error: blobError,
+      },
+      kv: {
+        configured: Boolean(kvUrl && kvToken),
+      },
+      timestamp: Date.now(),
+    })
+    return
+  }
+
+  // ─── 1. Handling GET: Read drinks from Vercel Blob or KV ─────────────────────
   if (req.method === 'GET') {
     // A. Check Vercel Blob first
     if (blobToken) {
       try {
         const { list } = await import('@vercel/blob')
-        const { blobs } = await list({ prefix: `${STORAGE_KEY}.json` })
+        const { blobs } = await list({ prefix: `${STORAGE_KEY}.json`, token: blobToken })
         if (blobs && blobs.length > 0) {
           const fetchRes = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: 'no-store' })
           if (fetchRes.ok) {
@@ -78,14 +117,29 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
       }
     }
 
-    // Return empty array with 200 so frontend falls back to its default drinks safely
+    // Return empty array with 200 so frontend falls back to default drinks safely
     res.status(200).json([])
     return
   }
 
-  // ─── 2. Handling POST/PUT: Save drinks list to Vercel Blob or KV ─────────────────
+  // ─── 2. Handling POST/PUT: Save drinks list to Vercel Blob or KV ───────────────
   if (req.method === 'POST' || req.method === 'PUT') {
-    const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
+    const rawBody = req.body
+    let payload = ''
+    let itemCount = 0
+
+    if (typeof rawBody === 'string') {
+      payload = rawBody
+      try {
+        const parsed = JSON.parse(rawBody)
+        if (Array.isArray(parsed)) itemCount = parsed.length
+      } catch {
+        // keep string
+      }
+    } else {
+      payload = JSON.stringify(rawBody)
+      if (Array.isArray(rawBody)) itemCount = rawBody.length
+    }
 
     // A. Save to Vercel Blob if connected
     if (blobToken) {
@@ -95,12 +149,22 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
           access: 'public',
           addRandomSuffix: false,
           allowOverwrite: true,
+          token: blobToken,
         })
-        res.status(200).json({ success: true, storage: 'blob', url: blob.url })
+        res.status(200).json({
+          success: true,
+          storage: 'blob',
+          itemCount,
+          url: blob.url,
+          message: 'Saved to Vercel Blob successfully. All devices will see updated prices!',
+        })
         return
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error saving to Vercel Blob:', err)
-        res.status(500).json({ error: 'Failed to save to Vercel Blob' })
+        res.status(500).json({
+          success: false,
+          error: 'Failed to save to Vercel Blob: ' + (err?.message || String(err)),
+        })
         return
       }
     }
@@ -117,17 +181,32 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
           body: JSON.stringify(payload),
         })
         const data = await response.json()
-        res.status(200).json({ success: true, storage: 'kv', kvResponse: data })
+        res.status(200).json({
+          success: true,
+          storage: 'kv',
+          itemCount,
+          kvResponse: data,
+          message: 'Saved to Vercel KV successfully. All devices will see updated prices!',
+        })
         return
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error saving to Vercel KV:', err)
-        res.status(500).json({ error: 'Failed to save to database' })
+        res.status(500).json({
+          success: false,
+          error: 'Failed to save to database: ' + (err?.message || String(err)),
+        })
         return
       }
     }
 
-    // Acknowledged even if DB not yet connected (localStorage keeps local copy)
-    res.status(200).json({ success: true, note: 'Saved locally; connect Vercel Blob or KV for global sync' })
+    // Neither Vercel Blob nor KV is connected in Vercel environment!
+    // Respond with success: false and clear notification so Admin UI warns the user
+    res.status(200).json({
+      success: false,
+      storage: 'none',
+      warning:
+        'Vercel Blob is not connected yet in your Vercel Project Settings. Price was saved ONLY on this laptop. Connect your Blob store to sync with mobile phones.',
+    })
     return
   }
 

@@ -35,16 +35,29 @@ export default function Admin() {
     addDrink,
     deleteDrink,
     resetToDefaults,
+    storageType,
+    checkCloudStatus,
   } = useDrinks()
 
   const [search, setSearch] = useState('')
   const [filterMode, setFilterMode] = useState<'all' | 'active' | 'off'>('all')
 
+  // Cloud Diagnostics & Guide
+  const [showCloudGuideModal, setShowCloudGuideModal] = useState(false)
+  const [isCheckingCloud, setIsCheckingCloud] = useState(false)
+
+  const handleCheckConnection = async () => {
+    setIsCheckingCloud(true)
+    await checkCloudStatus()
+    setIsCheckingCloud(false)
+    showToast('Checked Vercel database connection')
+  }
+
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const showToast = (msg: string) => {
     setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
+    setTimeout(() => setToastMessage(null), 4000)
   }
 
   // Quick Price Edit Modal
@@ -133,10 +146,14 @@ export default function Admin() {
     setTempPrice(item.price)
   }
 
-  const handleSavePrice = () => {
+  const handleSavePrice = async () => {
     if (editingPriceItem) {
-      updatePrice(editingPriceItem.id, tempPrice)
-      showToast(`Updated price for ${editingPriceItem.name} to ${formatNaira(tempPrice)}!`)
+      await updatePrice(editingPriceItem.id, tempPrice)
+      if (storageType === 'blob' || storageType === 'kv') {
+        showToast(`✓ Updated ${editingPriceItem.name} to ${formatNaira(tempPrice)} on Vercel Blob!`)
+      } else {
+        showToast(`⚠️ Updated ${editingPriceItem.name} locally. Connect Vercel Blob to sync with your phone!`)
+      }
       setEditingPriceItem(null)
     }
   }
@@ -160,7 +177,7 @@ export default function Admin() {
   }
 
   // Save Add / Edit
-  const handleSaveDrink = (e: React.FormEvent) => {
+  const handleSaveDrink = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName.trim()) {
       alert('Please enter a drink name.')
@@ -168,12 +185,16 @@ export default function Admin() {
     }
 
     if (editingDrink) {
-      updateDrink(editingDrink.id, {
+      await updateDrink(editingDrink.id, {
         name: formName.trim(),
         size: formSize.trim(),
         price: Number(formPrice) || 0,
       })
-      showToast(`Updated ${formName}!`)
+      if (storageType === 'blob' || storageType === 'kv') {
+        showToast(`✓ Updated ${formName} on Vercel Blob!`)
+      } else {
+        showToast(`⚠️ Updated ${formName} locally. Connect Vercel Blob for mobile sync.`)
+      }
     } else {
       addDrink({
         name: formName.trim(),
@@ -181,7 +202,11 @@ export default function Admin() {
         price: Number(formPrice) || 0,
         isAvailable: true,
       })
-      showToast(`Added ${formName} to Catalog!`)
+      if (storageType === 'blob' || storageType === 'kv') {
+        showToast(`✓ Added ${formName} to Catalog on Vercel Blob!`)
+      } else {
+        showToast(`⚠️ Added ${formName} locally. Connect Vercel Blob for mobile sync.`)
+      }
     }
 
     setIsFormModalOpen(false)
@@ -364,6 +389,76 @@ export default function Admin() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
+        {/* Cloud Sync Status Alert Bar */}
+        {storageType === 'blob' ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-600"></span>
+              </span>
+              <div>
+                <p className="text-xs sm:text-sm font-bold text-emerald-950">
+                  Vercel Blob Cloud Sync: Active 🟢
+                </p>
+                <p className="text-[11px] text-emerald-700">
+                  Every price update is live across mobile phones and customers worldwide.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleCheckConnection}
+              disabled={isCheckingCloud}
+              className="inline-flex items-center gap-1 rounded-xl bg-white border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors"
+            >
+              <span>{isCheckingCloud ? 'Checking...' : 'Re-check Connection'}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none">⚠️</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-black text-amber-900">
+                      Vercel Blob Not Connected (Prices Saving On Laptop Only)
+                    </p>
+                    <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900">
+                      Local Mode
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-amber-800 max-w-2xl leading-relaxed">
+                    <strong>Why your phone still shows old prices:</strong> Vercel Blob needs to be connected to this project in your Vercel Dashboard and redeployed. Right now, prices are saved inside this laptop browser only.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCloudGuideModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-95 transition-all"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>How to Fix (3 Steps)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCheckConnection}
+                  disabled={isCheckingCloud}
+                  className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+                >
+                  <span>{isCheckingCloud ? 'Testing...' : 'Test Connection'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Banner with Clear Instructions */}
         <div className="rounded-3xl border border-t3navy/8 bg-gradient-to-r from-t3navy to-t3navy-900 p-5 text-white shadow-lg sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -822,6 +917,105 @@ export default function Admin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Vercel Blob Connection Guide Modal */}
+      {showCloudGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-start justify-between border-b border-t3navy/10 pb-4">
+              <div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-t3navy/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-t3navy">
+                  ☁️ Global Sync Setup
+                </span>
+                <h2 className="mt-1 font-display text-xl font-black text-t3navy">
+                  Connect Vercel Blob to Sync With Phone
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowCloudGuideModal(false)}
+                className="rounded-full p-2 text-t3navy/40 hover:bg-t3navy/5 hover:text-t3navy"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3.5 text-xs text-t3navy/80">
+              <p className="leading-relaxed">
+                You already created your Vercel Blob store, but Vercel needs <strong>two quick clicks</strong> to connect it to this specific project so your phone can fetch the prices:
+              </p>
+
+              {/* Step 1 */}
+              <div className="rounded-2xl border border-t3navy/10 bg-paper/50 p-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-t3navy font-display text-xs font-black text-white">
+                    1
+                  </span>
+                  <p className="font-bold text-t3navy text-xs sm:text-sm">
+                    Connect Store in Vercel Storage
+                  </p>
+                </div>
+                <p className="mt-1 pl-8 text-[11px] text-t3navy/70 leading-relaxed">
+                  Go to <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" className="text-t3red font-bold underline">vercel.com</a> &rarr; click <strong>Storage</strong> at top &rarr; click your <strong>Blob Store</strong> &rarr; click the <strong>&ldquo;Connect Project&rdquo;</strong> button &rarr; select <strong>t3_store</strong> (or your site project) &rarr; click <strong>Save</strong>.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="rounded-2xl border border-t3navy/10 bg-paper/50 p-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-t3red font-display text-xs font-black text-white">
+                    2
+                  </span>
+                  <p className="font-bold text-t3navy text-xs sm:text-sm">
+                    Redeploy Once in Vercel
+                  </p>
+                </div>
+                <p className="mt-1 pl-8 text-[11px] text-t3navy/70 leading-relaxed">
+                  In your Vercel project, go to the <strong>Deployments</strong> tab &rarr; click the <strong>three dots (&hellip;)</strong> on the latest deployment &rarr; click <strong>Redeploy</strong>.<br />
+                  <span className="italic text-t3navy/60 font-medium">Why? Vercel only injects the Blob security token into serverless functions upon redeployment.</span>
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-600 font-display text-xs font-black text-white">
+                    3
+                  </span>
+                  <p className="font-bold text-emerald-950 text-xs sm:text-sm">
+                    Test &amp; Enjoy Live Sync!
+                  </p>
+                </div>
+                <p className="mt-1 pl-8 text-[11px] text-emerald-800 leading-relaxed">
+                  Once redeployed, click &ldquo;Test Connection Now&rdquo; below. The badge turns green 🟢 and every price you change instantly syncs to your phone and all customers!
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2 border-t border-t3navy/10 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowCloudGuideModal(false)}
+                className="rounded-full px-4 py-2 text-xs font-bold text-t3navy/70 hover:bg-t3navy/5"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleCheckConnection()
+                  if (storageType === 'blob') {
+                    setShowCloudGuideModal(false)
+                  }
+                }}
+                disabled={isCheckingCloud}
+                className="rounded-full bg-t3navy px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-t3navy/90 active:scale-95"
+              >
+                {isCheckingCloud ? 'Testing Connection...' : 'Test Connection Now'}
+              </button>
+            </div>
           </div>
         </div>
       )}

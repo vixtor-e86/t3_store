@@ -1,0 +1,12 @@
+{
+  "name": "t3-store-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm --prefix app run build",
+    "dev": "npm --prefix app run dev"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.0"
+  }
+}

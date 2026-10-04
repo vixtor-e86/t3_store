@@ -115,16 +115,37 @@ function saveStoredDrinks(items: DrinkItem[]) {
 
 // ─── Async Vercel Database sync helper ──────────────────────────────────────
 
-async function syncWithVercelApi(items: DrinkItem[]): Promise<boolean> {
+export interface CloudSyncResponse {
+  success: boolean
+  storage?: 'blob' | 'kv' | 'none' | 'error'
+  url?: string
+  message?: string
+  warning?: string
+  error?: string
+}
+
+async function syncWithVercelApi(items: DrinkItem[]): Promise<CloudSyncResponse> {
   try {
     const res = await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
     })
-    return res.ok
-  } catch {
-    return false
+    const data = await res.json()
+    return {
+      success: Boolean(data?.success),
+      storage: data?.storage || (res.ok ? 'unknown' : 'error'),
+      url: data?.url,
+      message: data?.message,
+      warning: data?.warning,
+      error: data?.error,
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      storage: 'error',
+      error: err?.message || 'Network error syncing with server',
+    }
   }
 }
 
@@ -134,8 +155,42 @@ export function useDrinks() {
   const [drinks, setDrinks] = useState<DrinkItem[]>(getStoredDrinks)
   const [loading, setLoading] = useState(false)
   const [isSynced, setIsSynced] = useState(true)
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(null)
+  const [storageType, setStorageType] = useState<'blob' | 'kv' | 'local_only' | 'checking'>('checking')
+  const [lastSyncWarning, setLastSyncWarning] = useState<string | null>(null)
 
-  // Listen to cross-component or cross-tab changes
+  // Diagnostics check for Vercel Blob / KV connection
+  const checkCloudStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/products?check=1&t=${Date.now()}`, { cache: 'no-store' })
+      if (!res.ok) {
+        setIsCloudConnected(false)
+        setStorageType('local_only')
+        return
+      }
+      const data = await res.json()
+      if (data?.blob?.connected) {
+        setIsCloudConnected(true)
+        setStorageType('blob')
+        setLastSyncWarning(null)
+      } else if (data?.storage === 'kv') {
+        setIsCloudConnected(true)
+        setStorageType('kv')
+        setLastSyncWarning(null)
+      } else {
+        setIsCloudConnected(false)
+        setStorageType('local_only')
+        setLastSyncWarning(
+          'Vercel Blob is not connected in your Vercel project settings. Changes are saved only locally.'
+        )
+      }
+    } catch {
+      setIsCloudConnected(false)
+      setStorageType('local_only')
+    }
+  }, [])
+
+  // Listen to cross-component or cross-tab changes & fetch on mount
   useEffect(() => {
     const handler = (e: Event) => {
       const custom = e as CustomEvent<DrinkItem[]>
@@ -155,9 +210,12 @@ export function useDrinks() {
     window.addEventListener(CHANGE_EVENT, handler)
     window.addEventListener('storage', storageHandler)
 
-    // Attempt to fetch from Vercel API on mount
+    // Check cloud database status
+    checkCloudStatus()
+
+    // Fetch latest drinks from Vercel API on mount (cache-busted)
     setLoading(true)
-    fetch('/api/products')
+    fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -180,13 +238,27 @@ export function useDrinks() {
       window.removeEventListener(CHANGE_EVENT, handler)
       window.removeEventListener('storage', storageHandler)
     }
-  }, [])
+  }, [checkCloudStatus])
 
   // Persist update and sync
-  const commit = useCallback((newDrinks: DrinkItem[]) => {
+  const commit = useCallback(async (newDrinks: DrinkItem[]) => {
     setDrinks(newDrinks)
     saveStoredDrinks(newDrinks)
-    syncWithVercelApi(newDrinks).then((ok) => setIsSynced(ok))
+    const result = await syncWithVercelApi(newDrinks)
+    if (result.success && (result.storage === 'blob' || result.storage === 'kv')) {
+      setIsSynced(true)
+      setIsCloudConnected(true)
+      setStorageType(result.storage)
+      setLastSyncWarning(null)
+    } else {
+      setIsSynced(false)
+      setIsCloudConnected(false)
+      setStorageType('local_only')
+      setLastSyncWarning(
+        result.warning || result.error || 'Saved locally only. Connect Vercel Blob for global mobile sync.'
+      )
+    }
+    return result
   }, [])
 
   // Quick price update (ideal for mom!)
@@ -195,7 +267,7 @@ export function useDrinks() {
       const updated = drinks.map((d) =>
         d.id === id ? { ...d, price: Math.max(0, Math.round(newPrice)) } : d
       )
-      commit(updated)
+      return commit(updated)
     },
     [drinks, commit]
   )
@@ -206,7 +278,7 @@ export function useDrinks() {
       const updated = drinks.map((d) =>
         d.id === id ? { ...d, isAvailable: !d.isAvailable } : d
       )
-      commit(updated)
+      return commit(updated)
     },
     [drinks, commit]
   )
@@ -215,7 +287,7 @@ export function useDrinks() {
   const updateDrink = useCallback(
     (id: string, updates: Partial<DrinkItem>) => {
       const updated = drinks.map((d) => (d.id === id ? { ...d, ...updates } : d))
-      commit(updated)
+      return commit(updated)
     },
     [drinks, commit]
   )
@@ -248,20 +320,24 @@ export function useDrinks() {
   const deleteDrink = useCallback(
     (id: string) => {
       const updated = drinks.filter((d) => d.id !== id)
-      commit(updated)
+      return commit(updated)
     },
     [drinks, commit]
   )
 
   // Reset back to factory defaults
   const resetToDefaults = useCallback(() => {
-    commit(DEFAULT_DRINKS)
+    return commit(DEFAULT_DRINKS)
   }, [commit])
 
   return {
     drinks,
     loading,
     isSynced,
+    isCloudConnected,
+    storageType,
+    lastSyncWarning,
+    checkCloudStatus,
     updatePrice,
     toggleAvailability,
     updateDrink,
