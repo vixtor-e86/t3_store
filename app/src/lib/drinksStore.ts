@@ -113,18 +113,102 @@ function saveStoredDrinks(items: DrinkItem[]) {
   }
 }
 
-// ─── Async Vercel Database sync helper ──────────────────────────────────────
+// ─── Supabase PostgreSQL Sync Helpers ───────────────────────────────────────
+
+import { supabase } from './supabase'
 
 export interface CloudSyncResponse {
   success: boolean
-  storage?: 'blob' | 'kv' | 'none' | 'error'
+  storage?: 'supabase' | 'blob' | 'kv' | 'none' | 'error'
   url?: string
   message?: string
   warning?: string
   error?: string
 }
 
+async function fetchSupabaseDrinks(): Promise<DrinkItem[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('t3_drinks')
+      .select('*')
+      .order('sort_order', { ascending: true })
+
+    if (error) {
+      return null
+    }
+
+    if (Array.isArray(data)) {
+      if (data.length === 0) {
+        // Table created but empty: auto-seed catalog into Supabase!
+        await seedSupabaseDrinks(DEFAULT_DRINKS)
+        return DEFAULT_DRINKS
+      }
+      return data.map((d: any) => ({
+        id: String(d.id),
+        name: String(d.name),
+        size: String(d.size),
+        price: Number(d.price) || 0,
+        category: d.category || 'PET Bottles',
+        image: d.image || undefined,
+        isAvailable: d.is_available !== false,
+      }))
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function seedSupabaseDrinks(items: DrinkItem[]) {
+  try {
+    const rows = items.map((item, index) => ({
+      id: item.id,
+      name: item.name,
+      size: item.size,
+      price: item.price,
+      category: item.category || 'PET Bottles',
+      image: item.image || null,
+      is_available: item.isAvailable !== false,
+      sort_order: index,
+    }))
+    await supabase.from('t3_drinks').upsert(rows, { onConflict: 'id' })
+  } catch {
+    // Seed error caught
+  }
+}
+
+async function saveToSupabase(items: DrinkItem[]): Promise<boolean> {
+  try {
+    const rows = items.map((item, index) => ({
+      id: item.id,
+      name: item.name,
+      size: item.size,
+      price: item.price,
+      category: item.category || 'PET Bottles',
+      image: item.image || null,
+      is_available: item.isAvailable !== false,
+      sort_order: index,
+      updated_at: new Date().toISOString(),
+    }))
+    const { error } = await supabase.from('t3_drinks').upsert(rows, { onConflict: 'id' })
+    return !error
+  } catch {
+    return false
+  }
+}
+
 async function syncWithVercelApi(items: DrinkItem[]): Promise<CloudSyncResponse> {
+  // First try direct Supabase update (lightning fast!)
+  const supabaseOk = await saveToSupabase(items)
+  if (supabaseOk) {
+    return {
+      success: true,
+      storage: 'supabase',
+      message: 'Saved directly to Supabase PostgreSQL database!',
+    }
+  }
+
+  // Backup: also send to serverless API
   try {
     const res = await fetch('/api/products', {
       method: 'POST',
@@ -135,7 +219,6 @@ async function syncWithVercelApi(items: DrinkItem[]): Promise<CloudSyncResponse>
     return {
       success: Boolean(data?.success),
       storage: data?.storage || (res.ok ? 'unknown' : 'error'),
-      url: data?.url,
       message: data?.message,
       warning: data?.warning,
       error: data?.error,
@@ -156,33 +239,27 @@ export function useDrinks() {
   const [loading, setLoading] = useState(false)
   const [isSynced, setIsSynced] = useState(true)
   const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(null)
-  const [storageType, setStorageType] = useState<'blob' | 'kv' | 'local_only' | 'checking'>('checking')
+  const [storageType, setStorageType] = useState<
+    'supabase' | 'blob' | 'kv' | 'table_missing' | 'local_only' | 'checking'
+  >('checking')
   const [lastSyncWarning, setLastSyncWarning] = useState<string | null>(null)
 
-  // Diagnostics check for Vercel Blob / KV connection
+  // Diagnostics check for Supabase connection
   const checkCloudStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/products?check=1&t=${Date.now()}`, { cache: 'no-store' })
-      if (!res.ok) {
+      const { error } = await supabase.from('t3_drinks').select('id').limit(1)
+      if (!error) {
+        setIsCloudConnected(true)
+        setStorageType('supabase')
+        setLastSyncWarning(null)
+      } else if (error.code === 'PGRST205' || error.message.includes('t3_drinks')) {
         setIsCloudConnected(false)
-        setStorageType('local_only')
-        return
-      }
-      const data = await res.json()
-      if (data?.blob?.connected) {
-        setIsCloudConnected(true)
-        setStorageType('blob')
-        setLastSyncWarning(null)
-      } else if (data?.storage === 'kv') {
-        setIsCloudConnected(true)
-        setStorageType('kv')
-        setLastSyncWarning(null)
+        setStorageType('table_missing')
+        setLastSyncWarning('Supabase table "t3_drinks" not created yet. Run the SQL script to create it.')
       } else {
         setIsCloudConnected(false)
         setStorageType('local_only')
-        setLastSyncWarning(
-          'Vercel Blob is not connected in your Vercel project settings. Changes are saved only locally.'
-        )
+        setLastSyncWarning(error.message)
       }
     } catch {
       setIsCloudConnected(false)
@@ -210,33 +287,60 @@ export function useDrinks() {
     window.addEventListener(CHANGE_EVENT, handler)
     window.addEventListener('storage', storageHandler)
 
-    // Check cloud database status
+    // Check Supabase database status
     checkCloudStatus()
 
-    // Fetch latest drinks from Vercel API on mount (cache-busted)
+    // 1. Fetch from Supabase directly
     setLoading(true)
-    fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const formatted = data.map((d: any) => ({
-            ...d,
-            isAvailable: d.isAvailable !== false,
-          }))
-          saveStoredDrinks(formatted)
-          setDrinks(formatted)
+    fetchSupabaseDrinks()
+      .then((remoteDrinks) => {
+        if (remoteDrinks && remoteDrinks.length > 0) {
+          saveStoredDrinks(remoteDrinks)
+          setDrinks(remoteDrinks)
+          setIsCloudConnected(true)
+          setStorageType('supabase')
+        } else {
+          // Fallback to /api/products
+          fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                const formatted = data.map((d: any) => ({
+                  ...d,
+                  isAvailable: d.isAvailable !== false,
+                }))
+                saveStoredDrinks(formatted)
+                setDrinks(formatted)
+              }
+            })
+            .catch(() => {})
         }
-      })
-      .catch(() => {
-        // Silently use localStorage fallback
       })
       .finally(() => {
         setLoading(false)
       })
 
+    // 2. Real-time live listener: When you change price on laptop, phone updates instantly!
+    const channel = supabase
+      .channel('t3_drinks_live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 't3_drinks' },
+        () => {
+          fetchSupabaseDrinks().then((latest) => {
+            if (latest && latest.length > 0) {
+              saveStoredDrinks(latest)
+              setDrinks(latest)
+            }
+          })
+        }
+      )
+      .subscribe()
+
     return () => {
       window.removeEventListener(CHANGE_EVENT, handler)
       window.removeEventListener('storage', storageHandler)
+      supabase.removeChannel(channel)
     }
   }, [checkCloudStatus])
 
@@ -245,17 +349,17 @@ export function useDrinks() {
     setDrinks(newDrinks)
     saveStoredDrinks(newDrinks)
     const result = await syncWithVercelApi(newDrinks)
-    if (result.success && (result.storage === 'blob' || result.storage === 'kv')) {
+    if (result.success && (result.storage === 'supabase' || result.storage === 'blob' || result.storage === 'kv')) {
       setIsSynced(true)
       setIsCloudConnected(true)
-      setStorageType(result.storage)
+      setStorageType(result.storage as any)
       setLastSyncWarning(null)
     } else {
       setIsSynced(false)
       setIsCloudConnected(false)
       setStorageType('local_only')
       setLastSyncWarning(
-        result.warning || result.error || 'Saved locally only. Connect Vercel Blob for global mobile sync.'
+        result.warning || result.error || 'Saved locally only. Run the Supabase SQL script for global mobile sync.'
       )
     }
     return result

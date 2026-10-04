@@ -149,10 +149,12 @@ export default function Admin() {
   const handleSavePrice = async () => {
     if (editingPriceItem) {
       await updatePrice(editingPriceItem.id, tempPrice)
-      if (storageType === 'blob' || storageType === 'kv') {
-        showToast(`✓ Updated ${editingPriceItem.name} to ${formatNaira(tempPrice)} on Vercel Blob!`)
+      if (storageType === 'supabase') {
+        showToast(`✓ Updated ${editingPriceItem.name} to ${formatNaira(tempPrice)} on Supabase!`)
+      } else if (storageType === 'blob' || storageType === 'kv') {
+        showToast(`✓ Updated ${editingPriceItem.name} to ${formatNaira(tempPrice)} on Cloud!`)
       } else {
-        showToast(`⚠️ Updated ${editingPriceItem.name} locally. Connect Vercel Blob to sync with your phone!`)
+        showToast(`⚠️ Updated ${editingPriceItem.name} locally. Run the Supabase SQL script to sync with phone!`)
       }
       setEditingPriceItem(null)
     }
@@ -190,10 +192,10 @@ export default function Admin() {
         size: formSize.trim(),
         price: Number(formPrice) || 0,
       })
-      if (storageType === 'blob' || storageType === 'kv') {
-        showToast(`✓ Updated ${formName} on Vercel Blob!`)
+      if (storageType === 'supabase') {
+        showToast(`✓ Updated ${formName} on Supabase!`)
       } else {
-        showToast(`⚠️ Updated ${formName} locally. Connect Vercel Blob for mobile sync.`)
+        showToast(`⚠️ Updated ${formName} locally. Run Supabase SQL script for mobile sync.`)
       }
     } else {
       addDrink({
@@ -202,10 +204,10 @@ export default function Admin() {
         price: Number(formPrice) || 0,
         isAvailable: true,
       })
-      if (storageType === 'blob' || storageType === 'kv') {
-        showToast(`✓ Added ${formName} to Catalog on Vercel Blob!`)
+      if (storageType === 'supabase') {
+        showToast(`✓ Added ${formName} to Catalog on Supabase!`)
       } else {
-        showToast(`⚠️ Added ${formName} locally. Connect Vercel Blob for mobile sync.`)
+        showToast(`⚠️ Added ${formName} locally. Run Supabase SQL script for mobile sync.`)
       }
     }
 
@@ -390,7 +392,7 @@ export default function Admin() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
         {/* Cloud Sync Status Alert Bar */}
-        {storageType === 'blob' ? (
+        {storageType === 'supabase' ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950 shadow-xs">
             <div className="flex items-center gap-2.5">
               <span className="relative flex h-3 w-3">
@@ -399,10 +401,10 @@ export default function Admin() {
               </span>
               <div>
                 <p className="text-xs sm:text-sm font-bold text-emerald-950">
-                  Vercel Blob Cloud Sync: Active 🟢
+                  Supabase Database: Live &amp; Synchronized 🟢
                 </p>
                 <p className="text-[11px] text-emerald-700">
-                  Every price update is live across mobile phones and customers worldwide.
+                  Connected to PostgreSQL (<span className="font-mono font-bold">hgpfezzfyqiecbshuxcn</span>). Every price update is instantly live on mobile phones and all devices!
                 </p>
               </div>
             </div>
@@ -411,25 +413,27 @@ export default function Admin() {
               disabled={isCheckingCloud}
               className="inline-flex items-center gap-1 rounded-xl bg-white border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors"
             >
-              <span>{isCheckingCloud ? 'Checking...' : 'Re-check Connection'}</span>
+              <span>{isCheckingCloud ? 'Checking...' : 'Re-check Database'}</span>
             </button>
           </div>
         ) : (
           <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none">⚠️</span>
+                <span className="text-2xl leading-none">⚡</span>
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-black text-amber-900">
-                      Vercel Blob Not Connected (Prices Saving On Laptop Only)
+                      {storageType === 'table_missing'
+                        ? 'Supabase Connected: Table "t3_drinks" Needed'
+                        : 'Supabase Sync Ready (Pending Table Creation)'}
                     </p>
                     <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900">
-                      Local Mode
+                      1 Step Remaining
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-amber-800 max-w-2xl leading-relaxed">
-                    <strong>Why your phone still shows old prices:</strong> Vercel Blob needs to be connected to this project in your Vercel Dashboard and redeployed. Right now, prices are saved inside this laptop browser only.
+                    Your Supabase keys are configured. Run the quick SQL script in your Supabase project so your phone and laptop can start syncing prices instantly.
                   </p>
                 </div>
               </div>
@@ -440,11 +444,10 @@ export default function Admin() {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-95 transition-all"
                 >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="16" x2="12" y2="12" />
-                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
                   </svg>
-                  <span>How to Fix (3 Steps)</span>
+                  <span>View SQL Script (1-Click)</span>
                 </button>
                 <button
                   type="button"
@@ -921,17 +924,17 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Vercel Blob Connection Guide Modal */}
+      {/* Supabase Connection Guide Modal */}
       {showCloudGuideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-t3navy/10 pb-4">
               <div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-t3navy/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-t3navy">
-                  ☁️ Global Sync Setup
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+                  ⚡ Supabase PostgreSQL Setup
                 </span>
                 <h2 className="mt-1 font-display text-xl font-black text-t3navy">
-                  Connect Vercel Blob to Sync With Phone
+                  Create Table &ldquo;t3_drinks&rdquo;
                 </h2>
               </div>
               <button
@@ -944,53 +947,106 @@ export default function Admin() {
 
             <div className="mt-4 space-y-3.5 text-xs text-t3navy/80">
               <p className="leading-relaxed">
-                You already created your Vercel Blob store, but Vercel needs <strong>two quick clicks</strong> to connect it to this specific project so your phone can fetch the prices:
+                Your Supabase project keys are connected! To start syncing prices between your laptop and phone, run this short SQL query once in your Supabase SQL Editor:
               </p>
 
-              {/* Step 1 */}
-              <div className="rounded-2xl border border-t3navy/10 bg-paper/50 p-3.5">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-t3navy font-display text-xs font-black text-white">
-                    1
+              {/* Direct SQL Link Button */}
+              <a
+                href="https://supabase.com/dashboard/project/hgpfezzfyqiecbshuxcn/sql/new"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between rounded-2xl bg-t3navy p-3 text-white shadow-md hover:bg-t3navy-900 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-7 w-7 place-items-center rounded-xl bg-white/20 text-sm">
+                    ↗
                   </span>
-                  <p className="font-bold text-t3navy text-xs sm:text-sm">
-                    Connect Store in Vercel Storage
-                  </p>
+                  <div>
+                    <p className="text-xs font-bold">Open Your Supabase SQL Editor</p>
+                    <p className="text-[10px] text-white/70">hgpfezzfyqiecbshuxcn.supabase.co</p>
+                  </div>
                 </div>
-                <p className="mt-1 pl-8 text-[11px] text-t3navy/70 leading-relaxed">
-                  Go to <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" className="text-t3red font-bold underline">vercel.com</a> &rarr; click <strong>Storage</strong> at top &rarr; click your <strong>Blob Store</strong> &rarr; click the <strong>&ldquo;Connect Project&rdquo;</strong> button &rarr; select <strong>t3_store</strong> (or your site project) &rarr; click <strong>Save</strong>.
-                </p>
+                <span className="text-xs font-bold text-emerald-400 group-hover:translate-x-0.5 transition-transform">
+                  Open &rarr;
+                </span>
+              </a>
+
+              {/* SQL Code Box */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-t3navy uppercase tracking-wider text-[11px]">
+                    SQL Query to Paste:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sql = `create table if not exists t3_drinks (
+  id text primary key,
+  name text not null,
+  size text not null,
+  price numeric not null default 0,
+  category text default 'PET Bottles',
+  image text,
+  is_available boolean default true,
+  sort_order integer default 0,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+alter table t3_drinks enable row level security;
+
+create policy "Allow public read access"
+  on t3_drinks for select
+  using (true);
+
+create policy "Allow all modifications"
+  on t3_drinks for all
+  using (true)
+  with check (true);`
+                      navigator.clipboard.writeText(sql)
+                      showToast('✓ Copied SQL to clipboard!')
+                    }}
+                    className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                  >
+                    Copy SQL
+                  </button>
+                </div>
+                <pre className="overflow-x-auto rounded-2xl border border-t3navy/15 bg-paper p-3 text-[10px] font-mono text-t3navy leading-tight select-all">
+{`create table if not exists t3_drinks (
+  id text primary key,
+  name text not null,
+  size text not null,
+  price numeric not null default 0,
+  category text default 'PET Bottles',
+  image text,
+  is_available boolean default true,
+  sort_order integer default 0,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+alter table t3_drinks enable row level security;
+
+create policy "Allow public read access"
+  on t3_drinks for select
+  using (true);
+
+create policy "Allow all modifications"
+  on t3_drinks for all
+  using (true)
+  with check (true);`}
+                </pre>
               </div>
 
-              {/* Step 2 */}
-              <div className="rounded-2xl border border-t3navy/10 bg-paper/50 p-3.5">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-t3red font-display text-xs font-black text-white">
-                    2
-                  </span>
-                  <p className="font-bold text-t3navy text-xs sm:text-sm">
-                    Redeploy Once in Vercel
-                  </p>
-                </div>
-                <p className="mt-1 pl-8 text-[11px] text-t3navy/70 leading-relaxed">
-                  In your Vercel project, go to the <strong>Deployments</strong> tab &rarr; click the <strong>three dots (&hellip;)</strong> on the latest deployment &rarr; click <strong>Redeploy</strong>.<br />
-                  <span className="italic text-t3navy/60 font-medium">Why? Vercel only injects the Blob security token into serverless functions upon redeployment.</span>
+              {/* Steps */}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="font-bold text-emerald-950 text-xs">
+                  What happens when you click &ldquo;Run&rdquo; in Supabase:
                 </p>
-              </div>
-
-              {/* Step 3 */}
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-600 font-display text-xs font-black text-white">
-                    3
-                  </span>
-                  <p className="font-bold text-emerald-950 text-xs sm:text-sm">
-                    Test &amp; Enjoy Live Sync!
-                  </p>
-                </div>
-                <p className="mt-1 pl-8 text-[11px] text-emerald-800 leading-relaxed">
-                  Once redeployed, click &ldquo;Test Connection Now&rdquo; below. The badge turns green 🟢 and every price you change instantly syncs to your phone and all customers!
-                </p>
+                <ol className="mt-1 list-decimal pl-4 text-[11px] text-emerald-900 space-y-1">
+                  <li>The table is created and protected with Row Level Security.</li>
+                  <li>Click <strong>&ldquo;Test Database Connection&rdquo;</strong> below.</li>
+                  <li>The badge turns green 🟢 and the app automatically seeds all current 50 drinks into Supabase!</li>
+                  <li>Any price you adjust now syncs to your phone and all customers in real-time.</li>
+                </ol>
               </div>
             </div>
 
@@ -1006,14 +1062,14 @@ export default function Admin() {
                 type="button"
                 onClick={async () => {
                   await handleCheckConnection()
-                  if (storageType === 'blob') {
+                  if (storageType === 'supabase') {
                     setShowCloudGuideModal(false)
                   }
                 }}
                 disabled={isCheckingCloud}
-                className="rounded-full bg-t3navy px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-t3navy/90 active:scale-95"
+                className="rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95"
               >
-                {isCheckingCloud ? 'Testing Connection...' : 'Test Connection Now'}
+                {isCheckingCloud ? 'Testing Connection...' : 'Test Database Connection'}
               </button>
             </div>
           </div>

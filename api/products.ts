@@ -1,8 +1,6 @@
 // ─── Vercel Serverless Function: /api/products ──────────────────────────────
-// Supports:
-// 1. Vercel Blob (BLOB_READ_WRITE_TOKEN) - 1-click in Vercel Storage
-// 2. Upstash Redis / Vercel KV (KV_REST_API_URL / UPSTASH_REDIS_REST_URL)
-// 3. Fallback reporting if neither is configured in Vercel environment.
+// Primary Database: Supabase PostgreSQL (Table: t3_drinks)
+// Fallbacks: Vercel Blob, KV, and Local Storage
 
 export const config = {
   runtime: 'nodejs',
@@ -21,7 +19,15 @@ interface ResponseLike {
   setHeader: (name: string, value: string) => void
 }
 
-const STORAGE_KEY = 't3_drinks_catalog'
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  'https://hgpfezzfyqiecbshuxcn.supabase.co'
+
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhncGZlenpmeXFpZWNic2h1eGNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzMyNDgsImV4cCI6MjA4OTI0OTI0OH0.uFxWrPRQZ5eCwdDy40yXjGs7Kw-3iRwDDebi7VpSmNE'
 
 export default async function handler(req: RequestLike, res: ResponseLike) {
   // CORS & caching headers
@@ -41,79 +47,76 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     return
   }
 
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL
-  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN
-
   const isCheckMode =
     Boolean(req.query?.check || req.query?.status) ||
     Boolean(req.url && (req.url.includes('check=1') || req.url.includes('status=1')))
 
   // ─── 0. Diagnostics Check Endpoint: /api/products?check=1 ───────────────────
   if (isCheckMode) {
-    let blobLive = false
-    let blobError: string | null = null
+    let supabaseStatus = 'disconnected'
+    let supabaseError: string | null = null
 
-    if (blobToken) {
-      try {
-        const { list } = await import('@vercel/blob')
-        await list({ prefix: `${STORAGE_KEY}.json`, token: blobToken })
-        blobLive = true
-      } catch (err: any) {
-        blobError = err?.message || String(err)
+    try {
+      const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/t3_drinks?select=id&limit=1`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      })
+      if (checkRes.ok) {
+        supabaseStatus = 'connected'
+      } else {
+        const errJson = await checkRes.json().catch(() => ({}))
+        supabaseError = errJson?.message || `HTTP ${checkRes.status}`
+        if (checkRes.status === 404 || supabaseError?.includes('PGRST205')) {
+          supabaseStatus = 'table_missing'
+        }
       }
+    } catch (err: any) {
+      supabaseError = err?.message || String(err)
     }
 
     res.status(200).json({
       status: 'ok',
-      storage: blobLive ? 'blob' : blobToken ? 'blob_error' : kvUrl ? 'kv' : 'none',
-      blob: {
-        configured: Boolean(blobToken),
-        connected: blobLive,
-        error: blobError,
-      },
-      kv: {
-        configured: Boolean(kvUrl && kvToken),
+      storage: supabaseStatus === 'connected' ? 'supabase' : 'local_only',
+      supabase: {
+        configured: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY),
+        status: supabaseStatus,
+        error: supabaseError,
       },
       timestamp: Date.now(),
     })
     return
   }
 
-  // ─── 1. Handling GET: Read drinks from Vercel Blob or KV ─────────────────────
+  // ─── 1. Handling GET: Read drinks from Supabase PostgreSQL ───────────────────
   if (req.method === 'GET') {
-    // A. Check Vercel Blob first
-    if (blobToken) {
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
       try {
-        const { list } = await import('@vercel/blob')
-        const { blobs } = await list({ prefix: `${STORAGE_KEY}.json`, token: blobToken })
-        if (blobs && blobs.length > 0) {
-          const fetchRes = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: 'no-store' })
-          if (fetchRes.ok) {
-            const data = await fetchRes.json()
-            res.status(200).json(data)
+        const fetchRes = await fetch(`${SUPABASE_URL}/rest/v1/t3_drinks?select=*&order=sort_order.asc`, {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+        })
+        if (fetchRes.ok) {
+          const rows = await fetchRes.json()
+          if (Array.isArray(rows) && rows.length > 0) {
+            const formatted = rows.map((r: any) => ({
+              id: r.id,
+              name: r.name,
+              size: r.size,
+              price: Number(r.price) || 0,
+              category: r.category || 'PET Bottles',
+              image: r.image || undefined,
+              isAvailable: r.is_available !== false,
+            }))
+            res.status(200).json(formatted)
             return
           }
         }
       } catch (err) {
-        console.error('Error reading from Vercel Blob:', err)
-      }
-    }
-
-    // B. Check KV / Upstash Redis
-    if (kvUrl && kvToken) {
-      try {
-        const response = await fetch(`${kvUrl}/get/${STORAGE_KEY}`, {
-          headers: { Authorization: `Bearer ${kvToken}` },
-        })
-        const data = await response.json()
-        if (data.result) {
-          const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result
-          res.status(200).json(parsed)
-          return
-        }
-      } catch (err) {
-        console.error('Error reading from Vercel KV:', err)
+        console.error('Error reading from Supabase:', err)
       }
     }
 
@@ -122,75 +125,69 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     return
   }
 
-  // ─── 2. Handling POST/PUT: Save drinks list to Vercel Blob or KV ───────────────
+  // ─── 2. Handling POST/PUT: Save drinks list to Supabase PostgreSQL ───────────
   if (req.method === 'POST' || req.method === 'PUT') {
+    let items: any[] = []
     const rawBody = req.body
-    let payload = ''
-    let itemCount = 0
 
     if (typeof rawBody === 'string') {
-      payload = rawBody
       try {
         const parsed = JSON.parse(rawBody)
-        if (Array.isArray(parsed)) itemCount = parsed.length
+        if (Array.isArray(parsed)) items = parsed
       } catch {
-        // keep string
+        // invalid JSON
       }
-    } else {
-      payload = JSON.stringify(rawBody)
-      if (Array.isArray(rawBody)) itemCount = rawBody.length
+    } else if (Array.isArray(rawBody)) {
+      items = rawBody
     }
 
-    // A. Save to Vercel Blob if connected
-    if (blobToken) {
+    // Save to Supabase
+    if (SUPABASE_URL && SUPABASE_ANON_KEY && items.length > 0) {
       try {
-        const { put } = await import('@vercel/blob')
-        const blob = await put(`${STORAGE_KEY}.json`, payload, {
-          access: 'public',
-          addRandomSuffix: false,
-          allowOverwrite: true,
-          token: blobToken,
-        })
-        res.status(200).json({
-          success: true,
-          storage: 'blob',
-          itemCount,
-          url: blob.url,
-          message: 'Saved to Vercel Blob successfully. All devices will see updated prices!',
-        })
-        return
-      } catch (err: any) {
-        console.error('Error saving to Vercel Blob:', err)
-        res.status(500).json({
-          success: false,
-          error: 'Failed to save to Vercel Blob: ' + (err?.message || String(err)),
-        })
-        return
-      }
-    }
+        const rows = items.map((item, index) => ({
+          id: item.id,
+          name: item.name,
+          size: item.size,
+          price: Number(item.price) || 0,
+          category: item.category || 'PET Bottles',
+          image: item.image || null,
+          is_available: item.isAvailable !== false,
+          sort_order: index,
+          updated_at: new Date().toISOString(),
+        }))
 
-    // B. Save to KV / Upstash Redis if connected
-    if (kvUrl && kvToken) {
-      try {
-        const response = await fetch(`${kvUrl}/set/${STORAGE_KEY}`, {
+        const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/t3_drinks`, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${kvToken}`,
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(rows),
         })
-        const data = await response.json()
-        res.status(200).json({
-          success: true,
-          storage: 'kv',
-          itemCount,
-          kvResponse: data,
-          message: 'Saved to Vercel KV successfully. All devices will see updated prices!',
-        })
-        return
+
+        if (upsertRes.ok) {
+          res.status(200).json({
+            success: true,
+            storage: 'supabase',
+            itemCount: items.length,
+            message: 'Saved to Supabase database successfully. All devices will see updated prices instantly!',
+          })
+          return
+        } else {
+          const errData = await upsertRes.json().catch(() => ({}))
+          console.error('Supabase save error:', errData)
+          res.status(200).json({
+            success: false,
+            storage: 'none',
+            error: errData?.message || 'Failed saving to Supabase table',
+            hint: 'Please ensure you created the t3_drinks table in Supabase SQL Editor.',
+          })
+          return
+        }
       } catch (err: any) {
-        console.error('Error saving to Vercel KV:', err)
+        console.error('Error saving to Supabase:', err)
         res.status(500).json({
           success: false,
           error: 'Failed to save to database: ' + (err?.message || String(err)),
@@ -199,13 +196,10 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
       }
     }
 
-    // Neither Vercel Blob nor KV is connected in Vercel environment!
-    // Respond with success: false and clear notification so Admin UI warns the user
     res.status(200).json({
       success: false,
       storage: 'none',
-      warning:
-        'Vercel Blob is not connected yet in your Vercel Project Settings. Price was saved ONLY on this laptop. Connect your Blob store to sync with mobile phones.',
+      warning: 'No items or Supabase not reachable. Saved locally in browser.',
     })
     return
   }
