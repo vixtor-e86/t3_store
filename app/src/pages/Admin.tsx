@@ -14,7 +14,19 @@ const COMMON_PACK_SIZES = [
   'Refill Bottle',
 ]
 
+const AUTH_STORAGE_KEY = 't3_admin_auth_session'
+
 export default function Admin() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(AUTH_STORAGE_KEY) === 'true'
+  })
+  const [passwordInput, setPasswordInput] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+
   const {
     drinks,
     updatePrice,
@@ -65,6 +77,57 @@ export default function Admin() {
   const totalDrinks = drinks.length
   const activeCount = drinks.filter((d) => d.isAvailable).length
   const offCount = totalDrinks - activeCount
+
+  // Login handler
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError('')
+    setIsVerifying(true)
+
+    const expectedPassword =
+      (import.meta.env.VITE_ADMIN_PASSWORD as string | undefined) ||
+      'Temitope2023'
+
+    // Check directly against env or fallback
+    if (passwordInput === expectedPassword) {
+      localStorage.setItem(AUTH_STORAGE_KEY, 'true')
+      setIsAuthenticated(true)
+      setIsVerifying(false)
+      showToast('Welcome to T3 Store Admin!')
+      return
+    }
+
+    // Try server verification if running with backend
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        localStorage.setItem(AUTH_STORAGE_KEY, 'true')
+        setIsAuthenticated(true)
+        setIsVerifying(false)
+        showToast('Welcome to T3 Store Admin!')
+        return
+      }
+    } catch {
+      // Backend not available
+    }
+
+    setIsVerifying(false)
+    setPasswordError('Incorrect password. Please verify and try again.')
+  }
+
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    setIsAuthenticated(false)
+    setPasswordInput('')
+    setPasswordError('')
+    showToast('Logged out of Admin')
+  }
 
   // Quick Price Handler
   const handleOpenPriceModal = (item: DrinkItem) => {
@@ -126,6 +189,116 @@ export default function Admin() {
     setIsFormModalOpen(false)
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // LOGIN SCREEN (If not authenticated)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-4 font-body text-t3navy">
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-t3navy px-5 py-3.5 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-5">
+            <span className="text-sm font-bold">{toastMessage}</span>
+          </div>
+        )}
+
+        <div className="w-full max-w-md rounded-3xl border border-t3navy/10 bg-white p-8 shadow-xl">
+          <div className="text-center">
+            <Link to="/" className="inline-flex items-center gap-2">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-t3red font-display text-xl font-black text-white shadow-sm">
+                T3
+              </span>
+              <span className="font-display text-2xl font-black tracking-tight text-t3navy">
+                Superstore
+              </span>
+            </Link>
+
+            <div className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-t3navy/5 px-3 py-1 text-xs font-bold uppercase tracking-wider text-t3navy/70">
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-t3red" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>Admin Authentication</span>
+            </div>
+
+            <h1 className="mt-3 font-display text-2xl font-black text-t3navy">
+              Store Manager Access
+            </h1>
+            <p className="mt-1 text-sm text-t3navy/60">
+              Please enter the administrator password to adjust drink prices, stock, and catalog items.
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-t3navy/70">
+                Admin Password
+              </label>
+              <div className="relative mt-1.5">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Enter admin password..."
+                  className="w-full rounded-2xl border-2 border-t3navy/15 bg-paper/60 px-4 py-3 pr-12 text-sm font-semibold text-t3navy outline-none focus:border-t3red focus:bg-white focus:ring-4 focus:ring-t3red/10"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-t3navy/40 hover:text-t3navy"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {passwordError && (
+                <p className="mt-2 text-xs font-bold text-red-600 animate-in fade-in">
+                  ✕ {passwordError}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifying}
+              className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-t3red px-6 text-sm font-bold text-white shadow-md transition-all hover:bg-t3red/90 hover:scale-[1.01] active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>{isVerifying ? 'Verifying...' : 'Unlock Store Admin'}</span>
+            </button>
+
+            <div className="pt-2 text-center">
+              <Link
+                to="/"
+                className="text-xs font-semibold text-t3navy/50 hover:text-t3navy underline"
+              >
+                ← Return to Customer Store
+              </Link>
+            </div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // AUTHENTICATED ADMIN DASHBOARD
+  // ──────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#F5F7FA] font-body text-t3navy">
       {/* Toast Notification */}
@@ -174,6 +347,18 @@ export default function Admin() {
                 <path d="M12 5v14m-7-7h14" />
               </svg>
               <span>+ Add New Drink</span>
+            </button>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100"
+              title="Lock and Log Out of Admin"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+              <span>Log Out</span>
             </button>
           </div>
         </div>
