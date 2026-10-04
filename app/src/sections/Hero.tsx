@@ -5,42 +5,42 @@ type HeroProps = {
 export default function Hero({ onOpenCatalog }: HeroProps) {
   return (
     <section id="home" className="relative isolate overflow-hidden">
-      {/* Background image - Clear and vibrant */}
+      {/* Background image - Properly seated on mobile and desktop */}
       <div className="absolute inset-0 -z-10">
         <img
           src="/images/hero.jpg"
           alt="T3 Superstore beverage warehouse and wholesale crates"
-          className="h-full w-full object-cover object-[65%_center] contrast-[1.06] brightness-[1.02]"
+          className="h-full w-full object-cover object-[center_25%] sm:object-[65%_center] contrast-[1.06] brightness-[1.02]"
           loading="eager"
         />
-        {/* Soft readability overlay: allows the background crates & drinks to be clearly seen */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white/85 via-white/45 to-transparent sm:from-white/75 sm:via-white/25 sm:to-transparent" />
+        {/* Responsive readability gradient: vertical soft fade on mobile, side-fade on desktop */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/75 to-white/35 sm:bg-gradient-to-r sm:from-white/85 sm:via-white/40 sm:to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent" />
       </div>
 
-      <div className="mx-auto flex min-h-[92svh] max-w-7xl flex-col justify-center px-4 pb-24 pt-32 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[85svh] sm:min-h-[92svh] max-w-7xl flex-col justify-center px-4 pb-16 pt-24 sm:pb-24 sm:pt-32 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-t3red/20 bg-white/80 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-t3red backdrop-blur">
             <span className="h-2 w-2 rounded-full bg-t3red" />
             Strictly Packs · Crates · Wholesale Supply
           </span>
 
-          <h1 className="mt-6 font-display text-[2.75rem] font-black leading-[0.95] tracking-tight text-t3navy sm:text-6xl lg:text-7xl">
+          <h1 className="mt-5 font-display text-3xl font-black leading-[1.05] tracking-tight text-t3navy sm:text-6xl lg:text-7xl">
             T3 Superstore
-            <span className="mt-2 block text-t3red">Packs, Crates &amp; More.</span>
+            <span className="mt-1 sm:mt-2 block text-t3red">Packs, Crates &amp; More.</span>
           </h1>
 
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-t3navy/70 sm:text-lg">
+          <p className="mt-4 sm:mt-6 max-w-xl text-sm leading-relaxed text-t3navy/80 sm:text-lg font-medium">
             Your trusted wholesale supplier for soft drinks, malt, energy and water.
             Sold strictly in full packs and crates with direct distributor pricing and fast delivery across Abuja.
           </p>
 
           {/* Primary Action Button: Browse Drinks to open dynamic catalog modal */}
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="mt-7 sm:mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={onOpenCatalog}
-              className="inline-flex min-h-[54px] items-center justify-center gap-3 rounded-full bg-t3red px-8 text-base font-bold text-white shadow-[0_12px_30px_-10px_rgba(228,0,43,0.6)] transition-all hover:scale-[1.03] active:scale-95"
+              className="w-full sm:w-auto inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-full bg-t3red px-8 text-base font-bold text-white shadow-[0_12px_30px_-10px_rgba(228,0,43,0.6)] transition-all hover:scale-[1.03] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -54,7 +54,7 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
             </button>
           </div>
 
-          <p className="mt-8 font-script text-2xl text-t3navy/60 sm:text-3xl">
+          <p className="mt-6 sm:mt-8 font-script text-xl sm:text-3xl text-t3navy/70">
             Genuine distributor stock. Sold strictly in full packs and crates.
           </p>
         </div>
