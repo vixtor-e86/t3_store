@@ -5,17 +5,17 @@ type HeroProps = {
 export default function Hero({ onOpenCatalog }: HeroProps) {
   return (
     <section id="home" className="relative isolate overflow-hidden">
-      {/* Background image */}
+      {/* Background image - Clear and vibrant */}
       <div className="absolute inset-0 -z-10">
         <img
           src="/images/hero.jpg"
           alt="T3 Superstore beverage warehouse and wholesale crates"
-          className="h-full w-full object-cover object-[70%_center]"
+          className="h-full w-full object-cover object-[65%_center] contrast-[1.06] brightness-[1.02]"
           loading="eager"
         />
-        {/* Readability gradients */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 sm:via-white/60" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-paper to-transparent" />
+        {/* Soft readability overlay: allows the background crates & drinks to be clearly seen */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white/85 via-white/45 to-transparent sm:from-white/75 sm:via-white/25 sm:to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent" />
       </div>
 
       <div className="mx-auto flex min-h-[92svh] max-w-7xl flex-col justify-center px-4 pb-24 pt-32 sm:px-6 lg:px-8">
