@@ -4,6 +4,7 @@
 // Supports local caching + Vercel Serverless/Database API synchronization.
 
 import { useState, useEffect, useCallback } from 'react'
+import { supabase } from './supabase'
 
 export interface DrinkItem {
   id: string
@@ -114,8 +115,6 @@ function saveStoredDrinks(items: DrinkItem[]) {
 }
 
 // ─── Supabase PostgreSQL Sync Helpers ───────────────────────────────────────
-
-import { supabase } from './supabase'
 
 export interface CloudSyncResponse {
   success: boolean
@@ -232,19 +231,61 @@ async function syncWithVercelApi(items: DrinkItem[]): Promise<CloudSyncResponse>
   }
 }
 
+// In-flight shared fetch promise to prevent duplicate requests when multiple components mount
+let sharedFetchPromise: Promise<DrinkItem[] | null> | null = null
+
+async function loadLatestRemoteDrinks(): Promise<DrinkItem[] | null> {
+  if (sharedFetchPromise) return sharedFetchPromise
+
+  sharedFetchPromise = (async () => {
+    try {
+      const remote = await fetchSupabaseDrinks()
+      if (remote && remote.length > 0) {
+        return remote
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback to /api/products
+    try {
+      const res = await fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((d: any) => ({
+            ...d,
+            isAvailable: d.isAvailable !== false,
+          }))
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null
+  })().finally(() => {
+    // Keep cached briefly before allowing next refresh
+    setTimeout(() => {
+      sharedFetchPromise = null
+    }, 4000)
+  })
+
+  return sharedFetchPromise
+}
+
 // ─── Main React Hook: useDrinks ─────────────────────────────────────────────
 
 export function useDrinks() {
   const [drinks, setDrinks] = useState<DrinkItem[]>(getStoredDrinks)
   const [loading, setLoading] = useState(false)
   const [isSynced, setIsSynced] = useState(true)
-  const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(null)
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(true)
   const [storageType, setStorageType] = useState<
     'supabase' | 'blob' | 'kv' | 'table_missing' | 'local_only' | 'checking'
-  >('checking')
+  >('supabase')
   const [lastSyncWarning, setLastSyncWarning] = useState<string | null>(null)
 
-  // Diagnostics check for Supabase connection
+  // Diagnostics check for Supabase connection (non-blocking)
   const checkCloudStatus = useCallback(async () => {
     try {
       const { error } = await supabase.from('t3_drinks').select('id').limit(1)
@@ -252,14 +293,9 @@ export function useDrinks() {
         setIsCloudConnected(true)
         setStorageType('supabase')
         setLastSyncWarning(null)
-      } else if (error.code === 'PGRST205' || error.message.includes('t3_drinks')) {
-        setIsCloudConnected(false)
-        setStorageType('table_missing')
-        setLastSyncWarning('Supabase table "t3_drinks" not created yet. Run the SQL script to create it.')
       } else {
         setIsCloudConnected(false)
         setStorageType('local_only')
-        setLastSyncWarning(error.message)
       }
     } catch {
       setIsCloudConnected(false)
@@ -269,6 +305,8 @@ export function useDrinks() {
 
   // Listen to cross-component or cross-tab changes & fetch on mount
   useEffect(() => {
+    let isMounted = true
+
     const handler = (e: Event) => {
       const custom = e as CustomEvent<DrinkItem[]>
       if (custom.detail) {
@@ -287,62 +325,33 @@ export function useDrinks() {
     window.addEventListener(CHANGE_EVENT, handler)
     window.addEventListener('storage', storageHandler)
 
-    // Check Supabase database status
-    checkCloudStatus()
-
-    // 1. Fetch from Supabase directly
+    // Load latest data from Supabase in background
     setLoading(true)
-    fetchSupabaseDrinks()
+    loadLatestRemoteDrinks()
       .then((remoteDrinks) => {
+        if (!isMounted) return
         if (remoteDrinks && remoteDrinks.length > 0) {
           saveStoredDrinks(remoteDrinks)
           setDrinks(remoteDrinks)
           setIsCloudConnected(true)
           setStorageType('supabase')
-        } else {
-          // Fallback to /api/products
-          fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data) => {
-              if (Array.isArray(data) && data.length > 0) {
-                const formatted = data.map((d: any) => ({
-                  ...d,
-                  isAvailable: d.isAvailable !== false,
-                }))
-                saveStoredDrinks(formatted)
-                setDrinks(formatted)
-              }
-            })
-            .catch(() => {})
         }
+      })
+      .catch(() => {
+        // Safe silent catch
       })
       .finally(() => {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       })
 
-    // 2. Real-time live listener: When you change price on laptop, phone updates instantly!
-    const channel = supabase
-      .channel('t3_drinks_live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 't3_drinks' },
-        () => {
-          fetchSupabaseDrinks().then((latest) => {
-            if (latest && latest.length > 0) {
-              saveStoredDrinks(latest)
-              setDrinks(latest)
-            }
-          })
-        }
-      )
-      .subscribe()
-
     return () => {
+      isMounted = false
       window.removeEventListener(CHANGE_EVENT, handler)
       window.removeEventListener('storage', storageHandler)
-      supabase.removeChannel(channel)
     }
-  }, [checkCloudStatus])
+  }, [])
 
   // Persist update and sync
   const commit = useCallback(async (newDrinks: DrinkItem[]) => {
