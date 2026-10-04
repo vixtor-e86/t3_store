@@ -1,6 +1,8 @@
 // ─── Vercel Serverless Function: /api/products ──────────────────────────────
-// Supports Vercel KV (Upstash) or Vercel Postgres natively.
-// If no database env vars are configured yet, gracefully returns defaults.
+// Supports:
+// 1. Vercel Blob (BLOB_READ_WRITE_TOKEN) - 1-click in Vercel Storage
+// 2. Upstash Redis / Vercel KV (KV_REST_API_URL / UPSTASH_REDIS_REST_URL)
+// 3. Fallback to local browser storage if neither is configured yet.
 
 export const config = {
   runtime: 'nodejs',
@@ -18,7 +20,7 @@ interface ResponseLike {
   setHeader: (name: string, value: string) => void
 }
 
-const KV_KEY = 't3_drinks_catalog'
+const STORAGE_KEY = 't3_drinks_catalog'
 
 export default async function handler(req: RequestLike, res: ResponseLike) {
   // CORS & caching headers
@@ -35,14 +37,34 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     return
   }
 
-  const kvUrl = process.env.KV_REST_API_URL
-  const kvToken = process.env.KV_REST_API_TOKEN
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN
 
-  // ─── 1. Handling GET: Read drinks from Vercel KV or return empty ─────────
+  // ─── 1. Handling GET: Read drinks from Vercel Blob or KV ─────────
   if (req.method === 'GET') {
+    // A. Check Vercel Blob first
+    if (blobToken) {
+      try {
+        const { list } = await import('@vercel/blob')
+        const { blobs } = await list({ prefix: `${STORAGE_KEY}.json` })
+        if (blobs && blobs.length > 0) {
+          const fetchRes = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: 'no-store' })
+          if (fetchRes.ok) {
+            const data = await fetchRes.json()
+            res.status(200).json(data)
+            return
+          }
+        }
+      } catch (err) {
+        console.error('Error reading from Vercel Blob:', err)
+      }
+    }
+
+    // B. Check KV / Upstash Redis
     if (kvUrl && kvToken) {
       try {
-        const response = await fetch(`${kvUrl}/get/${KV_KEY}`, {
+        const response = await fetch(`${kvUrl}/get/${STORAGE_KEY}`, {
           headers: { Authorization: `Bearer ${kvToken}` },
         })
         const data = await response.json()
@@ -55,18 +77,38 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
         console.error('Error reading from Vercel KV:', err)
       }
     }
+
     // Return empty array with 200 so frontend falls back to its default drinks safely
     res.status(200).json([])
     return
   }
 
-  // ─── 2. Handling POST/PUT: Save drinks list to Vercel KV ─────────────────
+  // ─── 2. Handling POST/PUT: Save drinks list to Vercel Blob or KV ─────────────────
   if (req.method === 'POST' || req.method === 'PUT') {
     const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
 
+    // A. Save to Vercel Blob if connected
+    if (blobToken) {
+      try {
+        const { put } = await import('@vercel/blob')
+        const blob = await put(`${STORAGE_KEY}.json`, payload, {
+          access: 'public',
+          addRandomSuffix: false,
+          allowOverwrite: true,
+        })
+        res.status(200).json({ success: true, storage: 'blob', url: blob.url })
+        return
+      } catch (err) {
+        console.error('Error saving to Vercel Blob:', err)
+        res.status(500).json({ error: 'Failed to save to Vercel Blob' })
+        return
+      }
+    }
+
+    // B. Save to KV / Upstash Redis if connected
     if (kvUrl && kvToken) {
       try {
-        const response = await fetch(`${kvUrl}/set/${KV_KEY}`, {
+        const response = await fetch(`${kvUrl}/set/${STORAGE_KEY}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${kvToken}`,
@@ -75,7 +117,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
           body: JSON.stringify(payload),
         })
         const data = await response.json()
-        res.status(200).json({ success: true, kvResponse: data })
+        res.status(200).json({ success: true, storage: 'kv', kvResponse: data })
         return
       } catch (err) {
         console.error('Error saving to Vercel KV:', err)
@@ -85,7 +127,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     }
 
     // Acknowledged even if DB not yet connected (localStorage keeps local copy)
-    res.status(200).json({ success: true, note: 'Saved locally; connect Vercel KV for global sync' })
+    res.status(200).json({ success: true, note: 'Saved locally; connect Vercel Blob or KV for global sync' })
     return
   }
 
