@@ -8,7 +8,6 @@ import {
   buildWhatsAppLink,
 } from '@/config'
 import { Logo, WhatsAppIcon } from './Header'
-
 export default function Footer() {
   return (
     <footer className="bg-t3navy-900 text-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
