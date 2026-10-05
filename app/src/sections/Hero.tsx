@@ -10,11 +10,11 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
         <img
           src="/images/hero.jpg"
           alt="T3 Superstore beverage warehouse and wholesale crates"
-          className="h-full w-full object-cover object-[70%_center] sm:object-[65%_center] contrast-[1.06] brightness-[1.02]"
+          className="h-full w-full object-cover object-[70%_center] sm:object-[65%_center] contrast-[1.08] brightness-[0.95]"
           loading="eager"
         />
-        {/* Responsive contrast gradient: subtle vertical wash on mobile, horizontal fade on desktop */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/94 via-white/82 to-paper/95 sm:bg-gradient-to-r sm:from-white/95 sm:via-white/55 sm:to-transparent" />
+        {/* Dark contrast gradient so white text pops with crystal clarity */}
+        <div className="absolute inset-0 bg-gradient-to-b from-t3navy/90 via-t3navy/75 to-t3navy/90 sm:bg-gradient-to-r sm:from-t3navy/95 sm:via-t3navy/70 sm:to-black/30" />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent" />
       </div>
 
@@ -22,20 +22,20 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
         <div className="max-w-2xl">
           {/* Badges container */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-t3red/20 bg-white/95 px-2.5 py-1 text-[9.5px] sm:text-xs font-bold uppercase tracking-[0.11em] sm:tracking-[0.18em] text-t3red backdrop-blur shadow-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-t3red" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-[0.11em] sm:tracking-[0.18em] text-white backdrop-blur shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-t3red animate-pulse" />
               Strictly Packs · Crates · Wholesale Supply
             </span>
           </div>
 
-          {/* Heading */}
-          <h1 className="mt-4 sm:mt-5 font-display text-[2.2rem] leading-[1.08] sm:text-6xl lg:text-7xl font-black tracking-tight text-t3navy">
+          {/* Heading: Pure White T3 Superstore with bold Red Accent */}
+          <h1 className="mt-4 sm:mt-5 font-display text-[2.4rem] leading-[1.06] sm:text-6xl lg:text-7xl font-black tracking-tight text-white drop-shadow-sm">
             T3 Superstore
             <span className="mt-1 sm:mt-2 block text-t3red">Packs, Crates &amp; More.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-3.5 sm:mt-6 max-w-xl text-sm sm:text-lg leading-relaxed text-t3navy/85 font-medium">
+          <p className="mt-3.5 sm:mt-6 max-w-xl text-sm sm:text-lg leading-relaxed text-white/90 font-medium drop-shadow-xs">
             Your trusted wholesale supplier for soft drinks, malt, energy and water.
             Sold strictly in full packs and crates with direct distributor pricing and fast delivery across Abuja.
           </p>
@@ -45,7 +45,7 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
             <button
               type="button"
               onClick={onOpenCatalog}
-              className="w-full sm:w-auto inline-flex min-h-[50px] sm:min-h-[54px] items-center justify-center gap-2.5 rounded-full bg-t3red px-8 text-sm sm:text-base font-bold text-white shadow-[0_12px_30px_-10px_rgba(228,0,43,0.6)] transition-all hover:scale-[1.03] active:scale-95"
+              className="w-full sm:w-auto inline-flex min-h-[50px] sm:min-h-[54px] items-center justify-center gap-2.5 rounded-full bg-t3red px-8 text-sm sm:text-base font-bold text-white shadow-[0_12px_30px_-10px_rgba(228,0,43,0.8)] transition-all hover:scale-[1.03] active:scale-95"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -59,7 +59,7 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
             </button>
           </div>
 
-          <p className="mt-5 sm:mt-8 font-script text-xl sm:text-3xl text-t3navy/70">
+          <p className="mt-5 sm:mt-8 font-script text-xl sm:text-3xl text-amber-200/90">
             Genuine distributor stock. Sold strictly in full packs and crates.
           </p>
         </div>
