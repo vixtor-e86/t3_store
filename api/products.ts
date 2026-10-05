@@ -204,5 +204,29 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     return
   }
 
+  // ─── 3. Handling DELETE: Delete single item from Supabase ─────────────────
+  if (req.method === 'DELETE') {
+    const id = req.query?.id || req.body?.id
+    if (id && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      try {
+        const delRes = await fetch(`${SUPABASE_URL}/rest/v1/t3_drinks?id=eq.${encodeURIComponent(String(id))}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+        })
+        if (delRes.ok) {
+          res.status(200).json({ success: true, message: `Deleted ${id} successfully` })
+          return
+        }
+      } catch (err: any) {
+        console.error('Error deleting from Supabase:', err)
+      }
+    }
+    res.status(200).json({ success: false, error: 'Could not delete item' })
+    return
+  }
+
   res.status(405).json({ error: 'Method Not Allowed' })
 }

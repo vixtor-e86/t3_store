@@ -222,65 +222,7 @@ export function itemMatchesCategory(
   return item.category?.toLowerCase() === selectedCategory.toLowerCase()
 }
 
-export const DEFAULT_DRINKS: DrinkItem[] = [
-  // ─── Core & Showcase Drinks ───────────────────────────────────────────────
-  { id: 'cola-crate', name: 'Coca-Cola Glass Crate', size: '50cl Glass · Crate of 24', price: 12000, category: 'Glass Bottles', isAvailable: true, image: '/images/product-cola-crate.jpg' },
-  { id: 'cola-pet', name: 'Coca-Cola', size: '50cl PET · Pack of 12', price: 6500, category: 'PET Bottles', isAvailable: true, image: '/images/product-cola-pet.jpg' },
-  { id: 'pepsi', name: 'Pepsi', size: '50cl PET · Pack of 12', price: 6200, category: 'PET Bottles', isAvailable: true, image: '/images/product-blue-pet.jpg' },
-  { id: 'fearless', name: 'Fearless Energy Drink', size: '500ml PET · Pack of 12', price: 6500, category: 'PET Bottles', isAvailable: true, image: '/images/product-fearless.jpg' },
-  { id: 'maltina-can', name: 'Maltina Classic', size: '33cl Can · Pack of 24', price: 14500, category: 'Cans & Water', isAvailable: true, image: '/images/product-maltina-can.jpg' },
-  { id: 'cway-water', name: 'CWAY Table Water', size: '75cl PET · Pack of 12', price: 2500, category: 'Cans & Water', isAvailable: true, image: '/images/product-cway-water.jpg' },
-  { id: 'nutri-milk', name: 'CWAY Nutri-Milk Apple', size: '500ml · Pack of 12', price: 7500, category: 'PET Bottles', isAvailable: true, image: '/images/product-nutri-milk.jpg' },
-  { id: 'cway-dispenser', name: 'CWAY Dispenser Water', size: '19 Litres · Refill Bottle', price: 1800, category: 'Cans & Water', isAvailable: true, image: '/images/product-cway-dispenser.jpg' },
-
-  // ─── Glass Bottles (Crates) ────────────────────────────────────────────────
-  { id: 'fanta-orange-glass-50', name: 'Fanta Orange', size: '50cl Glass · Crate of 12', price: 4500, category: 'Glass Bottles', isAvailable: true },
-  { id: 'fanta-lemon-glass-50', name: 'Fanta Lemon', size: '50cl Glass · Crate of 12', price: 4500, category: 'Glass Bottles', isAvailable: true },
-  { id: 'fanta-pineapple-glass-50', name: 'Fanta Pineapple', size: '50cl Glass · Crate of 12', price: 4500, category: 'Glass Bottles', isAvailable: true },
-  { id: 'sprite-glass-50', name: 'Sprite', size: '50cl Glass · Crate of 12', price: 4500, category: 'Glass Bottles', isAvailable: true },
-  { id: 'schweppes-chapman-glass-50', name: 'Schweppes Chapman', size: '50cl Glass · Crate of 12', price: 5200, category: 'Glass Bottles', isAvailable: true },
-  { id: 'schweppes-tonic-glass-50', name: 'Schweppes Tonic Water', size: '50cl Glass · Crate of 12', price: 5200, category: 'Glass Bottles', isAvailable: true },
-  { id: 'schweppes-soda-glass-50', name: 'Schweppes Soda Water', size: '50cl Glass · Crate of 12', price: 5000, category: 'Glass Bottles', isAvailable: true },
-  { id: 'schweppes-ginger-glass-50', name: 'Schweppes Ginger Ale', size: '50cl Glass · Crate of 12', price: 5200, category: 'Glass Bottles', isAvailable: true },
-  { id: 'krest-bitter-lemon-glass-50', name: 'Krest Bitter Lemon', size: '50cl Glass · Crate of 12', price: 4800, category: 'Glass Bottles', isAvailable: true },
-  { id: '7up-glass-50', name: '7UP', size: '50cl Glass · Crate of 12', price: 4500, category: 'Glass Bottles', isAvailable: true },
-  { id: 'mirinda-orange-glass-50', name: 'Mirinda Orange', size: '50cl Glass · Crate of 12', price: 4300, category: 'Glass Bottles', isAvailable: true },
-  { id: 'mirinda-apple-glass-50', name: 'Mirinda Apple', size: '50cl Glass · Crate of 12', price: 4300, category: 'Glass Bottles', isAvailable: true },
-  { id: 'mirinda-fruity-glass-50', name: 'Mirinda Fruity', size: '50cl Glass · Crate of 12', price: 4300, category: 'Glass Bottles', isAvailable: true },
-  { id: 'mountain-dew-glass-50', name: 'Mountain Dew', size: '50cl Glass · Crate of 12', price: 4800, category: 'Glass Bottles', isAvailable: true },
-  { id: 'teem-glass-50', name: 'Teem Bitter Lemon', size: '50cl Glass · Crate of 12', price: 4300, category: 'Glass Bottles', isAvailable: true },
-  { id: 'evervess-tonic-glass-50', name: 'Evervess Tonic Water', size: '50cl Glass · Crate of 12', price: 5000, category: 'Glass Bottles', isAvailable: true },
-  { id: 'evervess-soda-glass-50', name: 'Evervess Soda Water', size: '50cl Glass · Crate of 12', price: 4800, category: 'Glass Bottles', isAvailable: true },
-
-  // ─── 50cl PET Bottles (Packs) ──────────────────────────────────────────────
-  { id: 'coke-zero-pet-50', name: 'Coca-Cola Zero Sugar', size: '50cl PET · Pack of 12', price: 6000, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-orange-pet-50', name: 'Fanta Orange', size: '50cl PET · Pack of 12', price: 5800, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-lemon-pet-50', name: 'Fanta Lemon', size: '50cl PET · Pack of 12', price: 5800, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-pineapple-pet-50', name: 'Fanta Pineapple', size: '50cl PET · Pack of 12', price: 5800, category: 'PET Bottles', isAvailable: true },
-  { id: 'sprite-pet-50', name: 'Sprite', size: '50cl PET · Pack of 12', price: 5800, category: 'PET Bottles', isAvailable: true },
-  { id: 'schweppes-chapman-pet-50', name: 'Schweppes Chapman', size: '50cl PET · Pack of 12', price: 6500, category: 'PET Bottles', isAvailable: true },
-  { id: 'pepsi-black-pet-50', name: 'Pepsi Black Zero', size: '50cl PET · Pack of 12', price: 5500, category: 'PET Bottles', isAvailable: true },
-  { id: '7up-pet-50', name: '7UP', size: '50cl PET · Pack of 12', price: 5500, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-orange-pet-50', name: 'Mirinda Orange', size: '50cl PET · Pack of 12', price: 5300, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-apple-pet-50', name: 'Mirinda Apple', size: '50cl PET · Pack of 12', price: 5300, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-fruity-pet-50', name: 'Mirinda Fruity', size: '50cl PET · Pack of 12', price: 5300, category: 'PET Bottles', isAvailable: true },
-  { id: 'mountain-dew-pet-50', name: 'Mountain Dew', size: '50cl PET · Pack of 12', price: 5600, category: 'PET Bottles', isAvailable: true },
-
-  // ─── 35cl PET Bottles (Packs) ──────────────────────────────────────────────
-  { id: 'coke-pet-35', name: 'Coca-Cola', size: '35cl PET · Pack of 12', price: 4200, category: 'PET Bottles', isAvailable: true },
-  { id: 'coke-zero-pet-35', name: 'Coca-Cola Zero Sugar', size: '35cl PET · Pack of 12', price: 4200, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-orange-pet-35', name: 'Fanta Orange', size: '35cl PET · Pack of 12', price: 4000, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-lemon-pet-35', name: 'Fanta Lemon', size: '35cl PET · Pack of 12', price: 4000, category: 'PET Bottles', isAvailable: true },
-  { id: 'fanta-pineapple-pet-35', name: 'Fanta Pineapple', size: '35cl PET · Pack of 12', price: 4000, category: 'PET Bottles', isAvailable: true },
-  { id: 'sprite-pet-35', name: 'Sprite', size: '35cl PET · Pack of 12', price: 4000, category: 'PET Bottles', isAvailable: true },
-  { id: 'pepsi-pet-35', name: 'Pepsi', size: '35cl PET · Pack of 12', price: 3800, category: 'PET Bottles', isAvailable: true },
-  { id: 'pepsi-black-pet-35', name: 'Pepsi Black', size: '35cl PET · Pack of 12', price: 3800, category: 'PET Bottles', isAvailable: true },
-  { id: '7up-pet-35', name: '7UP', size: '35cl PET · Pack of 12', price: 3800, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-orange-pet-35', name: 'Mirinda Orange', size: '35cl PET · Pack of 12', price: 3600, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-apple-pet-35', name: 'Mirinda Apple', size: '35cl PET · Pack of 12', price: 3600, category: 'PET Bottles', isAvailable: true },
-  { id: 'mirinda-fruity-pet-35', name: 'Mirinda Fruity', size: '35cl PET · Pack of 12', price: 3600, category: 'PET Bottles', isAvailable: true },
-  { id: 'mountain-dew-pet-35', name: 'Mountain Dew', size: '35cl PET · Pack of 12', price: 3900, category: 'PET Bottles', isAvailable: true },
-]
+export const DEFAULT_DRINKS: DrinkItem[] = []
 
 const STORAGE_KEY = 't3_drinks_data_v3'
 const CHANGE_EVENT = 't3-drinks-changed'
@@ -288,25 +230,21 @@ const CHANGE_EVENT = 't3-drinks-changed'
 // ─── LocalStorage helpers ───────────────────────────────────────────────────
 
 function getStoredDrinks(): DrinkItem[] {
-  if (typeof window === 'undefined') return DEFAULT_DRINKS
+  if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DRINKS))
-      return DEFAULT_DRINKS
-    }
+    if (!raw) return []
     const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Ensure each item has isAvailable flag
+    if (Array.isArray(parsed)) {
       return parsed.map((item) => ({
         ...item,
         isAvailable: item.isAvailable !== false,
       }))
     }
-    return DEFAULT_DRINKS
+    return []
   } catch (e) {
     console.error('Failed reading drinks from localStorage:', e)
-    return DEFAULT_DRINKS
+    return []
   }
 }
 
@@ -343,17 +281,12 @@ async function fetchSupabaseDrinks(): Promise<DrinkItem[] | null> {
     }
 
     if (Array.isArray(data)) {
-      if (data.length === 0) {
-        // Table created but empty: auto-seed catalog into Supabase!
-        await seedSupabaseDrinks(DEFAULT_DRINKS)
-        return DEFAULT_DRINKS
-      }
       return data.map((d: any) => ({
         id: String(d.id),
         name: String(d.name),
         size: String(d.size),
         price: Number(d.price) || 0,
-        category: d.category || 'PET Bottles',
+        category: d.category || detectDrinkCategory({ name: d.name, size: d.size }),
         image: d.image || undefined,
         isAvailable: d.is_available !== false,
       }))
@@ -361,24 +294,6 @@ async function fetchSupabaseDrinks(): Promise<DrinkItem[] | null> {
     return null
   } catch {
     return null
-  }
-}
-
-async function seedSupabaseDrinks(items: DrinkItem[]) {
-  try {
-    const rows = items.map((item, index) => ({
-      id: item.id,
-      name: item.name,
-      size: item.size,
-      price: item.price,
-      category: item.category || 'PET Bottles',
-      image: item.image || null,
-      is_available: item.isAvailable !== false,
-      sort_order: index,
-    }))
-    await supabase.from('t3_drinks').upsert(rows, { onConflict: 'id' })
-  } catch {
-    // Seed error caught
   }
 }
 
@@ -635,18 +550,33 @@ export function useDrinks() {
     [drinks, commit]
   )
 
-  // Delete a drink
+  // Delete a drink permanently from database and local state
   const deleteDrink = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const updated = drinks.filter((d) => d.id !== id)
-      return commit(updated)
+      setDrinks(updated)
+      saveStoredDrinks(updated)
+
+      // Direct permanent DELETE on Supabase PostgreSQL database
+      try {
+        await supabase.from('t3_drinks').delete().eq('id', id)
+      } catch (e) {
+        console.error('Failed to delete drink from Supabase:', e)
+      }
+
+      // Also call backup serverless endpoint
+      try {
+        await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      } catch {}
+
+      return true
     },
-    [drinks, commit]
+    [drinks]
   )
 
-  // Reset back to factory defaults
+  // Clear / reset
   const resetToDefaults = useCallback(() => {
-    return commit(DEFAULT_DRINKS)
+    return commit([])
   }, [commit])
 
   return {
