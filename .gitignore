@@ -32,3 +32,10 @@ pnpm-debug.log*
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Printable flyers & generated docs
+*.docx
+*.pdf
+flyer.*
+t3_store_qr.png
+pdf_preview.png

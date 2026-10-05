@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useDrinks, type DrinkItem } from '@/lib/drinksStore'
+import { useDrinks, itemMatchesCategory, type DrinkItem } from '@/lib/drinksStore'
 import {
   WHATSAPP_NUMBER,
   formatNaira,
@@ -11,7 +11,13 @@ type Props = {
   onClose: () => void
 }
 
-const CATEGORY_FILTERS = ['All Drinks', 'PET Bottles', 'Glass Bottles', 'Cans & Water'] as const
+const CATEGORY_FILTERS = [
+  'All Drinks',
+  'PET Bottles',
+  'Glass Bottles',
+  'Cans',
+  'Table Water',
+] as const
 
 export default function CatalogModal({ isOpen, onClose }: Props) {
   const { drinks } = useDrinks()
@@ -39,21 +45,25 @@ export default function CatalogModal({ isOpen, onClose }: Props) {
     }
   }, [isOpen])
 
-  // Filtered items (all active drinks in one place, NO brand filtering)
+  // Filtered items with intelligent keyword-based category matching and multi-token search
   const filteredItems = useMemo(() => {
     return drinks.filter((item) => {
       // If turned off in admin, do not show in catalog
       if (item.isAvailable === false) return false
 
-      if (selectedCategory !== 'All Drinks' && item.category && item.category !== selectedCategory) {
+      // Intelligent keyword-based category matching
+      if (!itemMatchesCategory(item, selectedCategory)) {
         return false
       }
+
+      // Multi-word search across name, size and category
       if (search.trim()) {
-        const query = search.toLowerCase()
-        const matchesName = item.name.toLowerCase().includes(query)
-        const matchesSize = item.size.toLowerCase().includes(query)
-        if (!matchesName && !matchesSize) return false
+        const queryTokens = search.toLowerCase().trim().split(/\s+/)
+        const fullItemText = `${item.name} ${item.size} ${item.category || ''}`.toLowerCase()
+        const matchesAll = queryTokens.every((token) => fullItemText.includes(token))
+        if (!matchesAll) return false
       }
+
       return true
     })
   }, [drinks, selectedCategory, search])

@@ -6,14 +6,220 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
 
+export type DrinkCategory = 'PET Bottles' | 'Glass Bottles' | 'Cans' | 'Table Water' | 'Other Drinks'
+
 export interface DrinkItem {
   id: string
   name: string
   size: string
   price: number
   isAvailable: boolean // true = visible in customer catalog, false = turned off/hidden
-  category?: 'PET Bottles' | 'Glass Bottles' | 'Cans & Water' | 'Other Drinks'
+  category?: DrinkCategory | string
   image?: string
+}
+
+/**
+ * Smart keyword-based categorizer for drinks.
+ * Analyzes name, package size, and existing category to accurately assign category.
+ * Explicitly guards against brand overlap (e.g. CWAY produces both Table Water and Nutri-Milk drinks).
+ */
+export function detectDrinkCategory(item: {
+  name?: string
+  size?: string
+  category?: string
+}): DrinkCategory {
+  const text = `${item.name || ''} ${item.size || ''} ${item.category || ''}`.toLowerCase()
+
+  // Guard: Drinks, Dairy, Juices, and Sodas (like CWAY Nutri-Milk, Nutri-Yo) are NEVER water
+  const isFlavoredOrDairyOrSoda =
+    text.includes('nutri') ||
+    text.includes('milk') ||
+    text.includes('yogurt') ||
+    text.includes('yoghurt') ||
+    text.includes('juice') ||
+    text.includes('peach') ||
+    text.includes('apple') ||
+    text.includes('orange') ||
+    text.includes('chapman') ||
+    text.includes('cola') ||
+    text.includes('pepsi') ||
+    text.includes('fanta') ||
+    text.includes('sprite') ||
+    text.includes('malt') ||
+    text.includes('energy') ||
+    text.includes('fearless') ||
+    text.includes('predator') ||
+    text.includes('climax')
+
+  // 1. Table Water: Requires explicit water keywords and NOT flavored drinks/dairy
+  if (
+    !isFlavoredOrDairyOrSoda &&
+    (text.includes('water') ||
+      text.includes('dispenser') ||
+      text.includes('refill') ||
+      text.includes('19 litre') ||
+      text.includes('19l') ||
+      text.includes('aquafina') ||
+      text.includes('pure life'))
+  ) {
+    return 'Table Water'
+  }
+
+  // 2. Cans keywords (Maltina 33cl Can, Coke Can, 33 CL pack of 24, etc.)
+  if (
+    /\b(can|cans|tin|tins|canned)\b/i.test(text) ||
+    /33\s*cl/i.test(text) ||
+    /330\s*ml/i.test(text)
+  ) {
+    return 'Cans'
+  }
+
+  // 3. Glass Bottles / Crates keywords
+  if (
+    text.includes('glass') ||
+    text.includes('crate') ||
+    text.includes('rgb')
+  ) {
+    return 'Glass Bottles'
+  }
+
+  // 4. PET Bottles keywords (Plastic bottles, 50cl PET, 35cl, Nutri-Milk, etc.)
+  if (
+    text.includes('pet') ||
+    text.includes('plastic') ||
+    text.includes('50cl') ||
+    text.includes('35cl') ||
+    text.includes('500ml') ||
+    text.includes('60cl') ||
+    isFlavoredOrDairyOrSoda
+  ) {
+    return 'PET Bottles'
+  }
+
+  // Fallback check on existing category
+  if (item.category === 'Glass Bottles') return 'Glass Bottles'
+  if (item.category === 'Cans') return 'Cans'
+  if (item.category === 'Table Water') return 'Table Water'
+  if (item.category === 'PET Bottles') return 'PET Bottles'
+
+  return 'PET Bottles'
+}
+
+/**
+ * Checks whether an item matches a selected category filter.
+ * Uses flexible keyword detection on item name and size so any user-added items
+ * (e.g. "Mortina 33 CL back of 24", "J 1st table water", "seaway table water")
+ * match automatically without requiring manual tag configuration.
+ */
+export function itemMatchesCategory(
+  item: { name: string; size?: string; category?: string },
+  selectedCategory: string
+): boolean {
+  if (!selectedCategory || selectedCategory === 'All Drinks' || selectedCategory === 'All') {
+    return true
+  }
+
+  const text = `${item.name} ${item.size || ''} ${item.category || ''}`.toLowerCase()
+
+  // Guard: Flavored drinks, juices, and dairy are not water (even if made by CWAY)
+  const isFlavoredOrDairyOrSoda =
+    text.includes('nutri') ||
+    text.includes('milk') ||
+    text.includes('yogurt') ||
+    text.includes('yoghurt') ||
+    text.includes('juice') ||
+    text.includes('peach') ||
+    text.includes('apple') ||
+    text.includes('orange') ||
+    text.includes('chapman') ||
+    text.includes('cola') ||
+    text.includes('pepsi') ||
+    text.includes('fanta') ||
+    text.includes('sprite') ||
+    text.includes('malt') ||
+    text.includes('energy') ||
+    text.includes('fearless') ||
+    text.includes('predator') ||
+    text.includes('climax')
+
+  // Match: Table Water
+  if (selectedCategory === 'Table Water' || selectedCategory === 'Water') {
+    if (isFlavoredOrDairyOrSoda) return false
+    return (
+      text.includes('water') ||
+      text.includes('dispenser') ||
+      text.includes('refill') ||
+      text.includes('19 litre') ||
+      text.includes('19l') ||
+      text.includes('aquafina') ||
+      text.includes('pure life') ||
+      item.category === 'Table Water'
+    )
+  }
+
+  // Match: Cans
+  if (selectedCategory === 'Cans' || selectedCategory === 'Can') {
+    return (
+      /\b(can|cans|tin|tins|canned)\b/i.test(text) ||
+      /33\s*cl/i.test(text) ||
+      /330\s*ml/i.test(text) ||
+      item.category === 'Cans'
+    )
+  }
+
+  // Match: Glass Bottles
+  if (
+    selectedCategory === 'Glass Bottles' ||
+    selectedCategory === 'Glass' ||
+    selectedCategory === 'Crates'
+  ) {
+    return (
+      text.includes('glass') ||
+      text.includes('crate') ||
+      text.includes('rgb') ||
+      item.category === 'Glass Bottles'
+    )
+  }
+
+  // Match: PET Bottles
+  if (
+    selectedCategory === 'PET Bottles' ||
+    selectedCategory === 'PET' ||
+    selectedCategory === 'Plastic'
+  ) {
+    // If it's explicitly Table Water, Can, or Glass, exclude from PET Bottles
+    const isWater =
+      !isFlavoredOrDairyOrSoda &&
+      (text.includes('water') ||
+        text.includes('dispenser') ||
+        text.includes('refill') ||
+        text.includes('19 litre') ||
+        text.includes('19l') ||
+        text.includes('aquafina') ||
+        text.includes('pure life') ||
+        item.category === 'Table Water')
+
+    const isCan =
+      /\b(can|cans|tin|tins|canned)\b/i.test(text) ||
+      /33\s*cl/i.test(text) ||
+      /330\s*ml/i.test(text) ||
+      item.category === 'Cans'
+
+    const isGlass =
+      text.includes('glass') ||
+      text.includes('crate') ||
+      text.includes('rgb') ||
+      item.category === 'Glass Bottles'
+
+    if (isWater || isCan || isGlass) {
+      return false
+    }
+
+    return true
+  }
+
+  // Fallback direct match
+  return item.category?.toLowerCase() === selectedCategory.toLowerCase()
 }
 
 export const DEFAULT_DRINKS: DrinkItem[] = [
@@ -419,7 +625,7 @@ export function useDrinks() {
         size: item.size.trim(),
         price: Number(item.price) || 0,
         isAvailable: item.isAvailable ?? true,
-        category: (item.category as any) || 'PET Bottles',
+        category: (item.category as any) || detectDrinkCategory(item),
       }
 
       const updated = [newDrink, ...drinks]

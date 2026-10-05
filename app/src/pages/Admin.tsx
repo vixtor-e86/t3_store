@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router'
-import { useDrinks, type DrinkItem } from '@/lib/drinksStore'
+import { useDrinks, detectDrinkCategory, type DrinkItem } from '@/lib/drinksStore'
 import { formatNaira } from '@/config'
 
 const COMMON_PACK_SIZES = [
@@ -8,10 +8,12 @@ const COMMON_PACK_SIZES = [
   'Crate of 12',
   'Crate of 24',
   'Pack of 24',
+  '33cl Can · Pack of 24',
   '50cl PET · Pack of 12',
   '35cl PET · Pack of 12',
+  '75cl PET · Pack of 12',
   '50cl Glass · Crate of 12',
-  'Refill Bottle',
+  '19 Litres · Refill Bottle',
 ]
 
 const AUTH_STORAGE_KEY = 't3_admin_auth_session'
@@ -57,6 +59,7 @@ export default function Admin() {
   const [formName, setFormName] = useState('')
   const [formSize, setFormSize] = useState('50cl PET · Pack of 12')
   const [formPrice, setFormPrice] = useState<number>(5000)
+  const [formCategory, setFormCategory] = useState<string>('PET Bottles')
 
   // Filtered drinks list
   const filteredDrinks = useMemo(() => {
@@ -64,10 +67,9 @@ export default function Admin() {
       if (filterMode === 'active' && !d.isAvailable) return false
       if (filterMode === 'off' && d.isAvailable) return false
       if (search.trim()) {
-        const q = search.toLowerCase()
-        const matchesName = d.name.toLowerCase().includes(q)
-        const matchesSize = d.size.toLowerCase().includes(q)
-        if (!matchesName && !matchesSize) return false
+        const tokens = search.toLowerCase().trim().split(/\s+/)
+        const text = `${d.name} ${d.size} ${d.category || ''}`.toLowerCase()
+        if (!tokens.every((t) => text.includes(t))) return false
       }
       return true
     })
@@ -147,6 +149,7 @@ export default function Admin() {
     setFormName('')
     setFormSize('50cl PET · Pack of 12')
     setFormPrice(5000)
+    setFormCategory('PET Bottles')
     setIsFormModalOpen(true)
   }
 
@@ -156,6 +159,7 @@ export default function Admin() {
     setFormName(item.name)
     setFormSize(item.size)
     setFormPrice(item.price)
+    setFormCategory(item.category || detectDrinkCategory(item))
     setIsFormModalOpen(true)
   }
 
@@ -172,6 +176,7 @@ export default function Admin() {
         name: formName.trim(),
         size: formSize.trim(),
         price: Number(formPrice) || 0,
+        category: formCategory,
       })
       showToast(`Updated ${formName}!`)
     } else {
@@ -179,6 +184,7 @@ export default function Admin() {
         name: formName.trim(),
         size: formSize.trim(),
         price: Number(formPrice) || 0,
+        category: formCategory,
         isAvailable: true,
       })
       showToast(`Added ${formName} to Catalog!`)
@@ -745,11 +751,40 @@ export default function Admin() {
                   type="text"
                   required
                   value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Zobo Drink, Bigi Chapman, Eva Water..."
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormName(val)
+                    if (!editingDrink) {
+                      setFormCategory(detectDrinkCategory({ name: val, size: formSize }))
+                    }
+                  }}
+                  placeholder="e.g. Maltina Can, J-1st Table Water, Eva Water..."
                   className="mt-1.5 w-full rounded-2xl border border-t3navy/20 px-3.5 py-2.5 text-sm font-semibold text-t3navy focus:border-t3red focus:outline-none focus:ring-2 focus:ring-t3red/20"
                   autoFocus
                 />
+              </div>
+
+              {/* Category / Packaging Type */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-t3navy/70">
+                  Category / Packaging Type *
+                </label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {(['PET Bottles', 'Glass Bottles', 'Cans', 'Table Water'] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setFormCategory(cat)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                        formCategory === cat
+                          ? 'bg-t3navy text-white shadow-xs'
+                          : 'bg-t3navy/5 text-t3navy/70 hover:bg-t3navy/10'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Package / Size */}
@@ -761,8 +796,14 @@ export default function Admin() {
                   type="text"
                   required
                   value={formSize}
-                  onChange={(e) => setFormSize(e.target.value)}
-                  placeholder="e.g. 50cl PET · Pack of 12, Crate of 24..."
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormSize(val)
+                    if (!editingDrink) {
+                      setFormCategory(detectDrinkCategory({ name: formName, size: val }))
+                    }
+                  }}
+                  placeholder="e.g. 50cl PET · Pack of 12, 33cl Can · Pack of 24..."
                   className="mt-1.5 w-full rounded-2xl border border-t3navy/20 px-3.5 py-2.5 text-sm font-semibold text-t3navy focus:border-t3red focus:outline-none focus:ring-2 focus:ring-t3red/20"
                 />
 
@@ -772,7 +813,12 @@ export default function Admin() {
                     <button
                       key={sz}
                       type="button"
-                      onClick={() => setFormSize(sz)}
+                      onClick={() => {
+                        setFormSize(sz)
+                        if (!editingDrink) {
+                          setFormCategory(detectDrinkCategory({ name: formName, size: sz }))
+                        }
+                      }}
                       className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
                         formSize === sz
                           ? 'bg-t3navy text-white'
