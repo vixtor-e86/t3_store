@@ -10,11 +10,11 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
         <img
           src="/images/hero.jpg"
           alt="T3 Superstore beverage warehouse and wholesale crates"
-          className="h-full w-full object-cover object-[70%_center] sm:object-[65%_center] contrast-[1.08] brightness-[0.95]"
+          className="h-full w-full object-cover object-[75%_center] sm:object-[65%_center] contrast-[1.05] brightness-[1.02]"
           loading="eager"
         />
-        {/* Dark contrast gradient so white text pops with crystal clarity */}
-        <div className="absolute inset-0 bg-gradient-to-b from-t3navy/90 via-t3navy/75 to-t3navy/90 sm:bg-gradient-to-r sm:from-t3navy/95 sm:via-t3navy/70 sm:to-black/30" />
+        {/* Subtle low-opacity gradient: allows the background picture to stay sharp, bright, and vivid */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/20 to-black/45 sm:bg-gradient-to-r sm:from-black/60 sm:via-black/25 sm:to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent" />
       </div>
 
@@ -22,20 +22,20 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
         <div className="max-w-2xl">
           {/* Badges container */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-[0.11em] sm:tracking-[0.18em] text-white backdrop-blur shadow-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-black/35 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-[0.11em] sm:tracking-[0.18em] text-white backdrop-blur-md shadow-md">
               <span className="h-1.5 w-1.5 rounded-full bg-t3red animate-pulse" />
               Strictly Packs · Crates · Wholesale Supply
             </span>
           </div>
 
-          {/* Heading: Pure White T3 Superstore with bold Red Accent */}
-          <h1 className="mt-4 sm:mt-5 font-display text-[2.4rem] leading-[1.06] sm:text-6xl lg:text-7xl font-black tracking-tight text-white drop-shadow-sm">
+          {/* Heading: Pure White T3 Superstore with drop-shadow for sharp readability */}
+          <h1 className="mt-4 sm:mt-5 font-display text-[2.4rem] leading-[1.06] sm:text-6xl lg:text-7xl font-black tracking-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]">
             T3 Superstore
-            <span className="mt-1 sm:mt-2 block text-t3red">Packs, Crates &amp; More.</span>
+            <span className="mt-1 sm:mt-2 block text-t3red drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">Packs, Crates &amp; More.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-3.5 sm:mt-6 max-w-xl text-sm sm:text-lg leading-relaxed text-white/90 font-medium drop-shadow-xs">
+          <p className="mt-3.5 sm:mt-6 max-w-xl text-sm sm:text-lg leading-relaxed text-white font-semibold drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
             Your trusted wholesale supplier for soft drinks, malt, energy and water.
             Sold strictly in full packs and crates with direct distributor pricing and fast delivery across Abuja.
           </p>
@@ -59,7 +59,7 @@ export default function Hero({ onOpenCatalog }: HeroProps) {
             </button>
           </div>
 
-          <p className="mt-5 sm:mt-8 font-script text-xl sm:text-3xl text-amber-200/90">
+          <p className="mt-5 sm:mt-8 font-script text-xl sm:text-3xl text-amber-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
             Genuine distributor stock. Sold strictly in full packs and crates.
           </p>
         </div>
